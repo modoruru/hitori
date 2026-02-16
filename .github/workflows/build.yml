@@ -35,3 +35,10 @@ jobs:
 
       - name: Build with Gradle Wrapper
         run: ./gradlew build
+
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact
+          path: plugin/build/libs/hitori-1.0.jar
+          retention-days: 3

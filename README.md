@@ -19,6 +19,12 @@ This is what *hitori* tries to do by providing an API for registering such thing
 - Logging system with modules support
 
 ## Usage
+You can get a jar from [Actions](https://github.com/modoruru/hitori/actions) tab. hitori is built almost every commit.\
+Also, you can get module from [Releases](https://github.com/modoruru/hitori/releases) (if there's any).
+
+After downloading the jar, just put it into plugins folder.
+
+## API
 hitori is published via [JitPack](https://jitpack.io). Latest version: [![](https://jitpack.io/v/modoruru/hitori.svg)](https://jitpack.io/#modoruru/hitori)
 <details>
 <summary>maven</summary>
