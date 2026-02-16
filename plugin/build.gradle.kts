@@ -12,6 +12,8 @@ tasks {
 
     shadowJar {
         archiveBaseName.set("hitori")
+
+        from(project(":api").sourceSets.main.get().output)
     }
 
     jar {
