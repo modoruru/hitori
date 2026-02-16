@@ -23,17 +23,17 @@ tasks {
     }
 
     build {
-        dependsOn("shadowJar")
+        dependsOn(shadowJar)
     }
 }
 
 publishing {
     publications {
-        maven(MavenPublication) {
-            from components.java
-
+        create<MavenPublication>("maven") {
             artifactId = rootProject.name
-            version = rootProject.version
+            version = rootProject.version.toString()
+
+            artifact(tasks.named("shadowJar"))
         }
     }
 }

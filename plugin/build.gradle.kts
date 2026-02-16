@@ -8,25 +8,24 @@ dependencies {
     implementation(project(":api"))
 }
 
-shadowJar {
-    // from project(":api").sourceSets.main.output
-    // duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    archiveBaseName.set("hitori")
-}
-
 tasks {
+
+    shadowJar {
+        archiveBaseName.set("hitori")
+    }
+
     jar {
         archiveBaseName.set("hitori")
         enabled = false
     }
 
     build {
-        dependsOn("shadowJar")
+        dependsOn(shadowJar)
     }
-}
 
-processResources {
-    filesMatching("paper-plugin.yml") {
-        expand(Map.of("version", project.version))
+    processResources {
+        filesMatching("paper-plugin.yml") {
+            expand(mapOf("version" to project.version))
+        }
     }
 }
