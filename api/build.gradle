@@ -1,0 +1,39 @@
+plugins {
+    id("io.papermc.paperweight.userdev")
+    id("com.gradleup.shadow")
+    id("maven-publish")
+}
+
+dependencies {
+    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
+    api("com.h2database:h2:2.4.240")
+    api("org.json:json:20250517")
+    api("com.github.justlofe:FastBytes:1.0")
+    api("net.elytrium:serializer:1.1.1")
+}
+
+tasks {
+    jar {
+        archiveBaseName.set("hitori-api")
+        enabled = false
+    }
+
+    shadowJar {
+        archiveClassifier.set("")
+    }
+
+    build {
+        dependsOn("shadowJar")
+    }
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+
+            artifactId = rootProject.name
+            version = rootProject.version
+        }
+    }
+}

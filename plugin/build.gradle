@@ -1,0 +1,32 @@
+plugins {
+    id("io.papermc.paperweight.userdev")
+    id("com.gradleup.shadow")
+}
+
+dependencies {
+    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
+    implementation(project(":api"))
+}
+
+shadowJar {
+    // from project(":api").sourceSets.main.output
+    // duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    archiveBaseName.set("hitori")
+}
+
+tasks {
+    jar {
+        archiveBaseName.set("hitori")
+        enabled = false
+    }
+
+    build {
+        dependsOn("shadowJar")
+    }
+}
+
+processResources {
+    filesMatching("paper-plugin.yml") {
+        expand(Map.of("version", project.version))
+    }
+}
