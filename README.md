@@ -17,3 +17,43 @@ This is what *hitori* tries to do by providing an API for registering such thing
 - Registries for custom content
 - Many utils
 - Logging system with modules support
+
+## Usage
+hitori is published via [JitPack](https://jitpack.io). Latest version: [![](https://jitpack.io/v/modoruru/hitori.svg)](https://jitpack.io/#modoruru/hitori)
+<details>
+<summary>maven</summary>
+
+```xml
+	<repositories>
+		<repository>
+		    <id>jitpack.io</id>
+		    <url>https://jitpack.io</url>
+		</repository>
+	</repositories>
+```
+
+```xml
+	<dependency>
+	    <groupId>com.github.modoruru</groupId>
+	    <artifactId>hitori</artifactId>
+	    <version>version</version>
+	</dependency>
+```
+</details>
+<details>
+<summary>gradle</summary>
+
+```groovy
+repositories {
+    // ...
+    maven { url 'https://jitpack.io' }
+}
+```
+
+```groovy
+dependencies {
+    // ...
+    implementation 'com.github.modoruru:hitori:version'
+}
+```
+</details>
