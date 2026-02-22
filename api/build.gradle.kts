@@ -25,6 +25,11 @@ tasks {
     build {
         dependsOn(shadowJar)
     }
+
+    val sourcesJar by registering(Jar::class) {
+        archiveClassifier.set("sources")
+        from(sourceSets.main.get().allSource)
+    }
 }
 
 publishing {
@@ -34,6 +39,8 @@ publishing {
             version = rootProject.version.toString()
 
             artifact(tasks.named("shadowJar"))
+
+            artifact(tasks.named("sourcesJar"))
         }
     }
 }
