@@ -95,7 +95,7 @@ final class HitoriCommand extends CommandAPICommand {
                     .map(Module::moduleMeta);
             assert opt.isPresent();
             ModuleMeta moduleMeta = opt.get();
-            builder.append("    version: =").appendAqua(moduleMeta.version().toString()).newLine();
+            builder.append("    version: ").appendAqua(moduleMeta.version().toString()).newLine();
             builder.append("    description: \"").appendYellow(moduleMeta.description()).append("\"\n");
         }
 
