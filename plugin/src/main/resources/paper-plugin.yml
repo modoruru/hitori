@@ -7,6 +7,3 @@ dependencies:
     CommandAPI:
       load: AFTER
       required: true
-    SkinsRestorer:
-      load: BEFORE
-      required: false

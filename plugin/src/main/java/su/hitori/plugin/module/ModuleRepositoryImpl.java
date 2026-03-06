@@ -1,6 +1,10 @@
 package su.hitori.plugin.module;
 
+import io.papermc.paper.plugin.provider.classloader.ConfiguredPluginClassLoader;
+import io.papermc.paper.plugin.provider.classloader.PluginClassLoaderGroup;
 import net.kyori.adventure.key.Key;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.module.ModuleRepository;
 import su.hitori.api.util.Pipeline;
@@ -9,14 +13,17 @@ import su.hitori.plugin.CorePlugin;
 import java.io.File;
 import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Logger;
 
 public final class ModuleRepositoryImpl implements ModuleRepository {
 
     private final CorePlugin corePlugin;
+    private final Logger logger;
     private final Pipeline<ModuleDescriptorImpl> descriptors = new Pipeline<>();
 
     public ModuleRepositoryImpl(CorePlugin corePlugin) {
         this.corePlugin = corePlugin;
+        this.logger = corePlugin.loggerFactory().create(ModuleRepository.class);
     }
 
     Class<?> loadModuleSpecificClass(ModuleDescriptorImpl requestSource, String name, boolean resolve) {
@@ -49,7 +56,34 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         }
     }
 
+    @SuppressWarnings("UnstableApiUsage")
+    private void enablePaperAccessHook() {
+        // this code is a temporary solution and should probably be replaced with a more robust
+        if(!(corePlugin.getClass().getClassLoader() instanceof ConfiguredPluginClassLoader paperPluginClassLoader)) {
+            logger.warning("failed to initialize paper access hook: class loader is not an instance of PaperPluginClassLoader");
+            return;
+        }
+
+        PluginClassLoaderGroup group = paperPluginClassLoader.getGroup();
+        if(group == null) {
+            logger.warning("failed to initialize paper access hook: plugin class loader group is null.");
+            return;
+        }
+
+        for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {
+            if(plugin == corePlugin.plugin()) continue;
+            if(!(plugin.getClass().getClassLoader() instanceof ConfiguredPluginClassLoader pluginClassLoader)) {
+                logger.warning(plugin.getName() + " class loader is not an instance of ConfiguredPluginClassLoader, it's actually: " + plugin.getClass().getClassLoader().getClass().getSimpleName());
+                continue;
+            }
+
+            group.add(pluginClassLoader);
+        }
+    }
+
     public void load(File folder) {
+        enablePaperAccessHook();
+
         File[] files = folder.listFiles();
         if(files == null) return;
 

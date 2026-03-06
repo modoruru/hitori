@@ -19,8 +19,8 @@ import java.nio.file.Path;
 
 public final class CorePlugin extends JavaPlugin implements Hitori {
 
-    private final ModuleRepositoryImpl moduleRepository = new ModuleRepositoryImpl(this);
     private final LoggerFactory loggerFactory = new LoggerFactoryImpl();
+    private final ModuleRepositoryImpl moduleRepository = new ModuleRepositoryImpl(this);
     private final ServerCoreInfo serverCoreInfo = new ServerCoreInfoImpl();
 
     private HitoriConfiguration configuration;
@@ -71,6 +71,10 @@ public final class CorePlugin extends JavaPlugin implements Hitori {
     @Override
     public Plugin plugin() {
         return this;
+    }
+
+    public LoggerFactory loggerFactory() {
+        return loggerFactory;
     }
 
     @Override
