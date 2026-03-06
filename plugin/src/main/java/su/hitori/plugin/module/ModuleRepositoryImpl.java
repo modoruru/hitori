@@ -71,7 +71,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         }
 
         for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {
-            if(plugin == corePlugin.plugin()) continue;
+            if(plugin == corePlugin.plugin() || plugin.getName().equalsIgnoreCase("commandapi")) continue;
             if(!(plugin.getClass().getClassLoader() instanceof ConfiguredPluginClassLoader pluginClassLoader)) {
                 logger.warning(plugin.getName() + " class loader is not an instance of ConfiguredPluginClassLoader, it's actually: " + plugin.getClass().getClassLoader().getClass().getSimpleName());
                 continue;
