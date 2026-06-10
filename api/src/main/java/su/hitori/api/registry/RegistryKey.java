@@ -13,8 +13,8 @@ public record RegistryKey<E extends Keyed>(Key key, Class<E> clazz) {
 
     @Override
     public boolean equals(Object obj) {
-        if(!(obj instanceof RegistryKey<?> anotherKey)) return false;
-        return key.equals(anotherKey.key) && clazz.isAssignableFrom(anotherKey.clazz);
+        if(!(obj instanceof RegistryKey<?>(Key key1, Class<?> clazz1))) return false;
+        return key.equals(key1) && clazz.isAssignableFrom(clazz1);
     }
 
 }

@@ -17,7 +17,8 @@ public interface Hitori {
      * Returns an instance of Hitori in JVM.
      * @return hitori instance.
      */
-    static @Nullable Hitori instance() {
+    @SuppressWarnings("DataFlowIssue")
+    static Hitori instance() {
         return Optional.ofNullable(Bukkit.getServer().getServicesManager().getRegistration(Hitori.class))
                 .map(RegisteredServiceProvider::getProvider)
                 .orElse(null);

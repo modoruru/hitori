@@ -11,10 +11,12 @@ import net.kyori.adventure.key.Key;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
 import su.hitori.api.Pair;
+import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.Module;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.module.ModuleMeta;
 import su.hitori.api.module.ModuleRepository;
+import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Messages;
 import su.hitori.plugin.module.ModuleDescriptorImpl;
 
@@ -23,9 +25,11 @@ import java.io.InputStream;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.logging.Logger;
 
 final class HitoriCommand extends CommandAPICommand {
 
+    private static final Logger LOGGER = LoggerFactory.instance().create();
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("HH:mm dd.MM.yyyy (z)");
 
     private final CorePlugin corePlugin;
@@ -68,8 +72,8 @@ final class HitoriCommand extends CommandAPICommand {
                     (String) properties.getOrDefault("branch", "ide")
             ));
         }
-        catch (IOException e) {
-            e.printStackTrace();
+        catch (IOException exception) {
+            LOGGER.warning(LoggerUtil.exceptionToString(exception));
             return Optional.empty();
         }
     }

@@ -13,9 +13,10 @@ import java.util.*;
 /**
  * Text utils based on MiniMessage library
  */
+@SuppressWarnings("unused")
 public final class Text {
 
-    private static MiniMessage miniMessage;
+    private static @Nullable MiniMessage miniMessage;
     private static final Map<UUID, TagResolver> additionalResolvers = new HashMap<>();
 
     private Text() {
@@ -29,6 +30,7 @@ public final class Text {
      */
     public static Component create(@Nullable String input) {
         if(input == null || input.isEmpty()) return Component.empty();
+        assert miniMessage != null;
         return miniMessage.deserialize(input);
     }
 
@@ -64,6 +66,7 @@ public final class Text {
      */
     public static String serialize(@Nullable Component text) {
         if(text == null) return "";
+        assert miniMessage != null;
         return miniMessage.serialize(text);
     }
 
@@ -75,6 +78,7 @@ public final class Text {
      * @return screened text
      */
     public static String restrictTags(@NotNull String input) {
+        assert miniMessage != null;
         return miniMessage.escapeTags(input);
 //        return serialize(Component.text(input.replaceAll("(?<!\\\\)<", "\\\\<")));
     }

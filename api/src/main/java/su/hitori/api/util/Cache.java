@@ -10,16 +10,17 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
+@SuppressWarnings({"UnusedReturnValue", "unused"})
 public final class Cache<K, V> {
 
     private final Map<K, ValueWrapper<V>> map;
 
     private final long retainTime;
     private final ScheduledExecutorService scheduledExecutorService;
-    private final BiConsumer<K, V> removalListener;
+    private final @Nullable BiConsumer<K, V> removalListener;
     private final boolean callListenerOnlyOnAutoRemoval;
 
-    private Cache(Map<K, V> initialValues, long retainTime, ScheduledExecutorService scheduledExecutorService, BiConsumer<K, V> removalListener, boolean callListenerOnlyOnAutoRemoval) {
+    private Cache(Map<K, V> initialValues, long retainTime, ScheduledExecutorService scheduledExecutorService, @Nullable BiConsumer<K, V> removalListener, boolean callListenerOnlyOnAutoRemoval) {
         if(retainTime < 1 || retainTime > 60_000L) throw new IllegalArgumentException("retainTime can't be below 1 and more than 60000 (2ms to 1min)");
 
         this.map = new HashMap<>();
@@ -54,7 +55,8 @@ public final class Cache<K, V> {
         ValueWrapper<V> previouslyAssociated = map.put(key, wrapper);
         if(previouslyAssociated == null) return null;
 
-        previouslyAssociated.removeTask.cancel(true);
+        if(previouslyAssociated.removeTask != null)
+            previouslyAssociated.removeTask.cancel(true);
         return previouslyAssociated.value;
     }
 
@@ -72,7 +74,7 @@ public final class Cache<K, V> {
     private @Nullable V internalRemove(K key, boolean autoRemove) {
         ValueWrapper<V> wrapper = map.get(key);
         if(wrapper == null) return null;
-        if(!autoRemove)
+        if(!autoRemove && wrapper.removeTask != null)
             wrapper.removeTask.cancel(true);
 
         if(removalListener != null && !callListenerOnlyOnAutoRemoval && autoRemove)
@@ -96,7 +98,7 @@ public final class Cache<K, V> {
     private static final class ValueWrapper<V> {
 
         final V value;
-        ScheduledFuture<V> removeTask;
+        @Nullable ScheduledFuture<V> removeTask;
 
         ValueWrapper(V value) {
             this.value = value;
@@ -108,8 +110,8 @@ public final class Cache<K, V> {
 
         private final ScheduledExecutorService scheduledExecutorService;
         private long retainTime;
-        private Map<K, V> initialValues;
-        private BiConsumer<K, V> removalListener;
+        private @Nullable Map<K, V> initialValues;
+        private @Nullable BiConsumer<K, V> removalListener;
         private boolean callListenerOnlyOnAutoRemoval;
 
         Builder(ScheduledExecutorService scheduledExecutorService) {

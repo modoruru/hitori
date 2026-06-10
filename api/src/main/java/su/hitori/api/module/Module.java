@@ -2,7 +2,7 @@ package su.hitori.api.module;
 
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 import su.hitori.api.Version;
 import su.hitori.api.module.compatibility.CompatibilityLayer;
 import su.hitori.api.module.enable.EnableContext;
@@ -94,7 +94,7 @@ public abstract class Module implements Keyed {
      * Setups compatibility with others modules, called before enabling to determine which module are required for this one to run.
      * <p>
      * Does nothing by default.
-     * @param compatibilityLayer compatibilityLayer to setup compatibility
+     * @param compatibilityLayer compatibilityLayer to set up compatibility
      */
     public void setupCompatibility(CompatibilityLayer compatibilityLayer) {
     }

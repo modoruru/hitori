@@ -1,7 +1,6 @@
-jdk:
-  - openjdk23
-
 before_install:
+  - sdk install java 23.0.2-graalce
+  - sdk use java 23.0.2-graalce
   - chmod +x gradlew
 
 install:

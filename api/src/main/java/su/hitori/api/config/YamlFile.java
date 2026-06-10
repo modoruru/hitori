@@ -1,15 +1,19 @@
 package su.hitori.api.config;
 
-import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
+import su.hitori.api.logging.LoggerFactory;
+import su.hitori.api.util.LoggerUtil;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.logging.Logger;
 
 public class YamlFile extends YamlConfiguration {
 
+    private static final Logger LOGGER = LoggerFactory.instance().create();
+
     private final File file;
 
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     public YamlFile(File file) {
         this.file = file;
 
@@ -20,8 +24,8 @@ public class YamlFile extends YamlConfiguration {
             }
             load(file);
         }
-        catch (Throwable e) {
-            e.printStackTrace();
+        catch (Throwable exception) {
+            LOGGER.warning(LoggerUtil.exceptionToString(exception));
         }
     }
 
@@ -34,14 +38,18 @@ public class YamlFile extends YamlConfiguration {
         try {
             load(file);
         }
-        catch (IOException | InvalidConfigurationException e) {
-            e.printStackTrace();
+        catch (Throwable exception) {
+            LOGGER.warning(LoggerUtil.exceptionToString(exception));
         }
     }
 
     public void save() {
-        try {save(file);}
-        catch (IOException e) {e.printStackTrace();}
+        try {
+            save(file);
+        }
+        catch (Throwable exception) {
+            LOGGER.warning(LoggerUtil.exceptionToString(exception));
+        }
     }
 
 }

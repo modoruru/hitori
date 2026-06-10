@@ -8,6 +8,8 @@ import org.bukkit.Server;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import su.hitori.api.Hitori;
 
 import java.util.concurrent.TimeUnit;
@@ -15,28 +17,35 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author StreamVersus
  */
+@SuppressWarnings({"UnusedReturnValue", "unused"})
 public final class Task {
 
     private static final boolean runningFolia = Hitori.instance().serverCoreInfo().isFolia();
 
-    private final BukkitTask bukkitTask;
-    private final ScheduledTask scheduledTask;
+    private final @Nullable BukkitTask bukkitTask;
+    private final @Nullable ScheduledTask scheduledTask;
 
-    private Task(BukkitTask bukkitTask) {
+    private Task(@NotNull BukkitTask bukkitTask) {
         if(runningFolia) throw new IllegalStateException("Creating bukkit task on folia server");
         this.bukkitTask = bukkitTask;
         this.scheduledTask = null;
     }
 
-    private Task(ScheduledTask scheduledTask) {
+    private Task(@NotNull ScheduledTask scheduledTask) {
         if(!runningFolia) throw new IllegalStateException("Creating folia task on bukkit server");
         this.bukkitTask = null;
         this.scheduledTask = scheduledTask;
     }
 
     public void cancel() {
-        if(runningFolia) scheduledTask.cancel();
-        else bukkitTask.cancel();
+        if(runningFolia) {
+            assert scheduledTask != null;
+            scheduledTask.cancel();
+        }
+        else {
+            assert bukkitTask != null;
+            bukkitTask.cancel();
+        }
     }
 
     private static Task runBukkit(Runnable runnable, long delay) {
@@ -74,9 +83,13 @@ public final class Task {
     }
 
     public static Task runEntity(Entity entity, Runnable runnable, long delay) {
-        return runningFolia
-                ? new Task(entity.getScheduler().runDelayed(plugin(), (_) -> runnable.run(), null, delay))
-                : runBukkit(runnable, delay);
+        if(runningFolia) {
+            ScheduledTask scheduledTask = entity.getScheduler().runDelayed(plugin(), (_) -> runnable.run(), null, delay);
+            assert scheduledTask != null;
+            return new Task(scheduledTask);
+        }
+
+        return runBukkit(runnable, delay);
     }
 
     public static Task async(Runnable runnable, long delay) {
@@ -102,11 +115,14 @@ public final class Task {
     }
 
     public static Task runTaskTimerEntity(Entity entity, Runnable runnable, long delay, long period) {
-        return runningFolia
-                ? new Task(entity.getScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), null, delay, period))
-                : runTaskTimerBukkit(runnable, delay, period);
-    }
+        if(runningFolia) {
+            ScheduledTask scheduledTask = entity.getScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), null, delay, period);
+            assert scheduledTask != null;
+            return new Task(scheduledTask);
+        }
 
+        return runTaskTimerBukkit(runnable, delay, period);
+    }
 
     public static Task runTaskTimerAsync(Runnable runnable, long delay, long period) {
         return runningFolia

@@ -1,7 +1,5 @@
 package su.hitori.api.registry;
 
-import com.mojang.logging.annotations.FieldsAreNonnullByDefault;
-import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
 

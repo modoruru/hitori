@@ -19,6 +19,7 @@ record ExtendedMeta(String mainClass, String packageName, Key key, Version versi
         return new ModuleMeta(key, version, description);
     }
 
+    @SuppressWarnings("PatternValidation")
     public static ExtendedMeta readMetaFromJar(File jar) {
         try (JarFile jarFile = new JarFile(jar)) {
             JarEntry entry = jarFile.getJarEntry("hitori.properties");

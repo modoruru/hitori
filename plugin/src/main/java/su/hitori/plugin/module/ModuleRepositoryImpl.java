@@ -32,6 +32,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         // maybe replace with a faster logic
         Class<?> clazz = null;
         for (ModuleDescriptorImpl descriptor : descriptors) {
+            assert descriptor.getExtendedMeta() != null && descriptor.getClassLoader() != null;
             if(name.startsWith(descriptor.getExtendedMeta().packageName())) {
                 try {
                     clazz = descriptor.getClassLoader().loadClass(requestSource, name, resolve);
@@ -43,7 +44,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
 
     void callEnableHooks(Key enabled) {
         for (ModuleDescriptorImpl descriptor : descriptors) {
-            assert descriptor != null;
+            assert descriptor != null && descriptor.getCompatibilityLayer() != null;
             if(!descriptor.isEnabled() || descriptor.key().equals(enabled)) continue;
 
             Runnable runnable = descriptor.getCompatibilityLayer().enableHooks.get(enabled);
@@ -100,6 +101,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         if(!moduleJarFile.isFile() || !moduleJarFile.getName().endsWith(".jar")) return;
 
         for (ModuleDescriptorImpl descriptor : descriptors) {
+            assert descriptor.getJar() != null;
             if(descriptor.getJar().equals(moduleJarFile))
                 throw new IllegalArgumentException("This jar already loaded as module!");
         }
@@ -121,6 +123,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         descriptors.forEach(ModuleDescriptorImpl::setupCompatibility);
 
         descriptors.sort((first, second) -> {
+            assert first.getCompatibilityLayer() != null && second.getCompatibilityLayer() != null;
             if(first.getCompatibilityLayer().required.contains(second.key())) return 1;
             else if (second.getCompatibilityLayer().required.contains(first.key())) return -1;
             return 0;
