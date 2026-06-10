@@ -8,15 +8,13 @@ import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.CommandAPIArgumentType;
 import dev.jorel.commandapi.arguments.TextArgument;
 import dev.jorel.commandapi.executors.CommandArguments;
+import org.jspecify.annotations.Nullable;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 
 public final class DateArgument extends Argument<ZonedDateTime> {
 
@@ -34,7 +32,7 @@ public final class DateArgument extends Argument<ZonedDateTime> {
     }
 
     @Override
-    public Class<ZonedDateTime> getPrimitiveType() {
+    public @Nullable Class<ZonedDateTime> getPrimitiveType() {
         return null;
     }
 

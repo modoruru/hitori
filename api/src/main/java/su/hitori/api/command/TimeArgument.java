@@ -7,6 +7,7 @@ import dev.jorel.commandapi.arguments.Argument;
 import dev.jorel.commandapi.arguments.CommandAPIArgumentType;
 import dev.jorel.commandapi.arguments.TextArgument;
 import dev.jorel.commandapi.executors.CommandArguments;
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.util.language.Language;
 import su.hitori.api.util.time.LocalizedTimeUtil;
 
@@ -25,7 +26,7 @@ public final class TimeArgument extends Argument<Long> {
     }
 
     @Override
-    public Class<Long> getPrimitiveType() {
+    public @Nullable Class<Long> getPrimitiveType() {
         return null;
     }
 

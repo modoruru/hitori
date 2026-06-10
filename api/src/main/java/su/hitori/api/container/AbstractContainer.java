@@ -2,7 +2,7 @@ package su.hitori.api.container;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public abstract class AbstractContainer implements Container {
 
@@ -15,7 +15,7 @@ public abstract class AbstractContainer implements Container {
             SIX_ROWS = ONE_ROW * 6;
 
     protected final Player player;
-    protected Inventory inventory;
+    protected @Nullable Inventory inventory;
 
     protected AbstractContainer(Player player) {
         this.player = player;
@@ -24,7 +24,7 @@ public abstract class AbstractContainer implements Container {
     public abstract Inventory create();
 
     @Override
-    public @NotNull Inventory getInventory() {
+    public Inventory getInventory() {
         if(inventory == null) inventory = create();
         return inventory;
     }

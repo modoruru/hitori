@@ -2,7 +2,7 @@ package su.hitori.api.module;
 
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.Version;
 import su.hitori.api.module.compatibility.CompatibilityLayer;
 import su.hitori.api.module.enable.EnableContext;
@@ -70,7 +70,7 @@ public abstract class Module implements Keyed {
      * Key of this module
      */
     @Override
-    public final @NotNull Key key() {
+    public final Key key() {
         return moduleMeta.key();
     }
 
@@ -103,7 +103,7 @@ public abstract class Module implements Keyed {
 
     public abstract void disable();
 
-    public InputStream getResourceAsStream(String path) {
+    public @Nullable InputStream getResourceAsStream(String path) {
         return getClass().getClassLoader().getResourceAsStream(path);
     }
 

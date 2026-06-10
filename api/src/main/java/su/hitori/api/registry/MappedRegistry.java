@@ -2,7 +2,6 @@ package su.hitori.api.registry;
 
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
-import org.jetbrains.annotations.NotNullByDefault;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -12,7 +11,6 @@ import java.util.stream.Stream;
  * Basic implementation of registry based on Map
  * @param <E> elements type
  */
-@NotNullByDefault
 public class MappedRegistry<E extends Keyed> implements Registry<E> {
 
     private final RegistryKey<E> key;

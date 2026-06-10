@@ -1,8 +1,9 @@
 package su.hitori.api.registry;
 
+import com.mojang.logging.annotations.FieldsAreNonnullByDefault;
+import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
-import org.jetbrains.annotations.NotNullByDefault;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
@@ -15,7 +16,6 @@ import java.util.stream.Stream;
  * Registry of keyed elements
  * @param <E> elements type
  */
-@NotNullByDefault
 public interface Registry<E extends Keyed> {
 
     /**

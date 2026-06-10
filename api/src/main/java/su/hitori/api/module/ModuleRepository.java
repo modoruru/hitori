@@ -33,7 +33,7 @@ public interface ModuleRepository {
     /**
      * Checks if module under specified key exists in session
      * @param key module key
-     * @return does module exists
+     * @return does module exist
      */
     boolean isModuleExists(Key key);
 

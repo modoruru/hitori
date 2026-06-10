@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -15,6 +16,7 @@ public interface Messages {
             ERROR = Type.ERROR,
             WARNING = Type.WARNING;
 
+    @SuppressWarnings("DataFlowIssue")
     static Component createStatic(Type type, Component component) {
         return Optional.ofNullable(Bukkit.getServer().getServicesManager().getRegistration(Messages.class))
                 .map(RegisteredServiceProvider::getProvider)

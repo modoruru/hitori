@@ -5,8 +5,8 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.title.Title;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.*;
 
@@ -27,7 +27,7 @@ public final class Text {
      * @param input text in minimessage format
      * @return created component
      */
-    public static @NotNull Component create(@Nullable String input) {
+    public static Component create(@Nullable String input) {
         if(input == null || input.isEmpty()) return Component.empty();
         return miniMessage.deserialize(input);
     }
@@ -62,7 +62,7 @@ public final class Text {
      * @param text component
      * @return component serialized as text
      */
-    public static @NotNull String serialize(@Nullable Component text) {
+    public static String serialize(@Nullable Component text) {
         if(text == null) return "";
         return miniMessage.serialize(text);
     }
@@ -74,7 +74,7 @@ public final class Text {
      * @param input text potentially containing tags
      * @return screened text
      */
-    public static @NotNull String restrictTags(@NotNull String input) {
+    public static String restrictTags(@NotNull String input) {
         return miniMessage.escapeTags(input);
 //        return serialize(Component.text(input.replaceAll("(?<!\\\\)<", "\\\\<")));
     }
@@ -104,7 +104,7 @@ public final class Text {
      * @param resolver TagResolver to add
      * @return unique id of resolver. can be used to later remove that TagResolver using {@link #removeResolver(UUID)}
      */
-    public static UUID addResolver(TagResolver resolver) {
+    public static @Nullable UUID addResolver(TagResolver resolver) {
         if(resolver == null) return null;
         UUID uuid = UUID.randomUUID();
         additionalResolvers.put(uuid, resolver);

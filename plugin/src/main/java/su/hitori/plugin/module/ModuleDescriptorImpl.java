@@ -6,11 +6,12 @@ import net.kyori.adventure.key.Keyed;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.Module;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.module.enable.EnableContext;
+import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Task;
 import su.hitori.plugin.CorePlugin;
 import su.hitori.plugin.module.compatibility.CompatibilityLayerImpl;
@@ -18,7 +19,6 @@ import su.hitori.plugin.module.enable.CommandsRegistrarImpl;
 import su.hitori.plugin.module.enable.ListenersRegistrarImpl;
 
 import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -49,17 +49,17 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     private final CorePlugin corePlugin;
     private final ModuleRepositoryImpl moduleRepository;
 
-    private Key key;
-    private ExtendedMeta extendedMeta;
-    private File currentJar;
-    private ModuleClassLoader classLoader;
+    private @Nullable Key key;
+    private @Nullable ExtendedMeta extendedMeta;
+    private @Nullable File currentJar;
+    private @Nullable ModuleClassLoader classLoader;
 
-    private Module moduleInstance;
-    private ListenersRegistrarImpl listenersRegistrar;
-    private CommandsRegistrarImpl commandsRegistrar;
-    private CompatibilityLayerImpl compatibilityLayer;
+    private @Nullable Module moduleInstance;
+    private @Nullable ListenersRegistrarImpl listenersRegistrar;
+    private @Nullable CommandsRegistrarImpl commandsRegistrar;
+    private @Nullable CompatibilityLayerImpl compatibilityLayer;
 
-    private EnableContext lastEnableContext;
+    private @Nullable EnableContext lastEnableContext;
     private boolean enabling;
     private boolean enabled;
     private boolean loaded; // is jar loaded or not
@@ -71,24 +71,25 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         this.moduleRepository = moduleRepository;
     }
 
-    public ClassLoader classLoader() {
+    public @Nullable ClassLoader classLoader() {
         return classLoader;
     }
 
-    ExtendedMeta getExtendedMeta() {
+    @Nullable ExtendedMeta getExtendedMeta() {
         return extendedMeta;
     }
 
-    ModuleClassLoader getClassLoader() {
+    @Nullable ModuleClassLoader getClassLoader() {
         return classLoader;
     }
 
-    CompatibilityLayerImpl getCompatibilityLayer() {
+    @Nullable CompatibilityLayerImpl getCompatibilityLayer() {
         return compatibilityLayer;
     }
 
     @Override
     public Module getInstance() {
+        assert moduleInstance != null;
         return moduleInstance;
     }
 
@@ -105,11 +106,12 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     boolean setupCompatibility() {
         if(!loaded || enabled || compatibilitySetUp) return true;
         try {
+            assert moduleInstance != null;
             moduleInstance.setupCompatibility(compatibilityLayer);
         }
-        catch (Throwable ex) {
+        catch (Throwable exception) {
             logger.severe("Module caused an exception in setupCompatibility - cancelled enabling. Exception presented below.");
-            ex.printStackTrace();
+            logger.warning(LoggerUtil.exceptionToString(exception));
             return false;
         }
 
@@ -123,11 +125,13 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     void enable(boolean callIncomingHooks, Key ignoreOurHookFor) {
         if(!loaded || enabled || enabling) return;
         try {
+            assert key != null;
             logger.info("Enabling module \"" + key.asString() + "\"");
             if(!compatibilitySetUp && !setupCompatibility()) return;
             enabling = true;
 
             Set<String> notFound = new HashSet<>();
+            assert compatibilityLayer != null;
             for (Key requiredModule : compatibilityLayer.required) {
                 if(!requiredModule.equals(key) && moduleRepository.getModule(requiredModule).isEmpty())
                     notFound.add(requiredModule.asString());
@@ -139,16 +143,18 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                 return;
             }
 
+            assert listenersRegistrar != null && commandsRegistrar != null;
             listenersRegistrar.frozen = false;
             commandsRegistrar.frozen = false;
 
             EnableContext context = lastEnableContext = new EnableContext(listenersRegistrar, commandsRegistrar, enabledOnce, new CompletableFuture<>());
             try {
+                assert moduleInstance != null;
                 moduleInstance.enable(context);
             }
-            catch (Throwable ex) {
+            catch (Throwable exception) {
                 logger.severe("Module caused an exception while enabling - disabling it. Exception presented below.");
-                ex.printStackTrace();
+                logger.warning(LoggerUtil.exceptionToString(exception));
                 enabling = false;
                 Task.async(this::disable, 0L);
                 return;
@@ -176,8 +182,8 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                         try {
                             entry.getValue().run();
                         }
-                        catch (Throwable e) {
-                            e.printStackTrace();
+                        catch (Throwable exception) {
+                            logger.warning(LoggerUtil.exceptionToString(exception));
                         }
                     }
                 });
@@ -193,33 +199,36 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
             if(!enabledOnce) enabledOnce = true;
         }
-        catch (Throwable ex) {
-            ex.printStackTrace();
+        catch (Throwable exception) {
+            logger.warning(LoggerUtil.exceptionToString(exception));
         }
     }
 
     void disable() {
         if(!loaded || !enabled) return;
         try {
+            assert key != null;
             logger.info("Disabling module \"" + key.asString() + "\"");
             disableInternal();
             enabled = false;
             compatibilitySetUp = false;
         }
-        catch (Throwable ex) {
-            ex.printStackTrace();
+        catch (Throwable exception) {
+            logger.warning(LoggerUtil.exceptionToString(exception));
         }
     }
 
     private void disableInternal() {
         try {
+            assert moduleInstance != null;
             moduleInstance.disable();
         }
-        catch (Throwable ex) {
+        catch (Throwable exception) {
             logger.severe("Module caused an exception while disabling.");
-            ex.printStackTrace();
+            logger.warning(LoggerUtil.exceptionToString(exception));
         }
 
+        assert listenersRegistrar != null && commandsRegistrar != null;
         for (Listener listener : listenersRegistrar.listeners) {
             HandlerList.unregisterAll(listener);
         }
@@ -249,12 +258,14 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     @Override
     public File getFolder() {
+        assert key != null;
         return new File(corePlugin.getDataFolder(), key.asString().replace(':', '_'));
     }
 
     public Optional<List<Key>> getReloadAffectedModules() {
         if(!enabled) return Optional.empty();
 
+        assert classLoader != null;
         Set<ModuleDescriptorImpl> injected = classLoader.getInjectedModules();
         if(injected.isEmpty()) return Optional.empty();
 
@@ -287,13 +298,14 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             if(!newKey.equals(key))
                 throw new IllegalStateException("Different keys in jars! Current: " + key.asString() + ", Present: " + newKey.asString());
 
+            assert classLoader != null;
             injected.addAll(classLoader.getInjectedModules());
 
             try {
                 classLoader.close();
             }
-            catch (IOException e) {
-                e.printStackTrace();
+            catch (Throwable exception) {
+                logger.warning(LoggerUtil.exceptionToString(exception));
             }
             loaded = false;
         }
@@ -343,15 +355,17 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         }
 
         moduleRepository.callEnableHooks(key);
+        assert lastEnableContext != null;
         lastEnableContext.enableHooksFuture().complete(null);
     }
 
-    public File getJar() {
+    public @Nullable File getJar() {
         return currentJar;
     }
 
     @Override
-    public @NotNull Key key() {
+    public Key key() {
+        assert key != null;
         return key;
     }
 

@@ -5,8 +5,10 @@ import io.papermc.paper.plugin.provider.classloader.PluginClassLoaderGroup;
 import net.kyori.adventure.key.Key;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.module.ModuleRepository;
+import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Pipeline;
 import su.hitori.plugin.CorePlugin;
 
@@ -26,7 +28,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         this.logger = corePlugin.loggerFactory().create(ModuleRepository.class);
     }
 
-    Class<?> loadModuleSpecificClass(ModuleDescriptorImpl requestSource, String name, boolean resolve) {
+    @Nullable Class<?> loadModuleSpecificClass(ModuleDescriptorImpl requestSource, String name, boolean resolve) {
         // maybe replace with a faster logic
         Class<?> clazz = null;
         for (ModuleDescriptorImpl descriptor : descriptors) {
@@ -50,8 +52,8 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
             try {
                 runnable.run();
             }
-            catch (Throwable ex) {
-                ex.printStackTrace();
+            catch (Throwable exception) {
+                logger.warning(LoggerUtil.exceptionToString(exception));
             }
         }
     }
@@ -107,8 +109,8 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
             descriptor = new ModuleDescriptorImpl(corePlugin, this);
             descriptor.reload(moduleJarFile, false, Set.of());
         }
-        catch (Throwable ex) {
-            ex.printStackTrace();
+        catch (Throwable exception) {
+            logger.warning(LoggerUtil.exceptionToString(exception));
             return;
         }
 

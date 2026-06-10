@@ -1,6 +1,7 @@
 package su.hitori.api.util;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.function.Function;
@@ -12,10 +13,10 @@ import java.util.function.Function;
  */
 public final class Either<A, B> {
 
-    private final A first;
-    private final B second;
+    private final @Nullable A first;
+    private final @Nullable B second;
 
-    private Either(A first, B second) {
+    private Either(@Nullable A first, @Nullable B second) {
         this.first = first;
         this.second = second;
     }

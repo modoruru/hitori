@@ -100,7 +100,7 @@ public class Pipeline<T> implements Iterable<T> {
     }
 
     @Override
-    public @NotNull Iterator<T> iterator() {
+    public Iterator<T> iterator() {
         return stream().iterator();
     }
 

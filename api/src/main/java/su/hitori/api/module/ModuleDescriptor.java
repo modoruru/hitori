@@ -1,6 +1,7 @@
 package su.hitori.api.module;
 
 import net.kyori.adventure.key.Keyed;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 
@@ -29,6 +30,6 @@ public interface ModuleDescriptor extends Keyed {
      */
     File getFolder();
 
-    ClassLoader classLoader();
+    @Nullable ClassLoader classLoader();
 
 }

@@ -31,13 +31,11 @@ public class YamlFile extends YamlConfiguration {
     }
 
     public void reload() {
-        if(file != null) {
-            try {
-                load(file);
-            }
-            catch (IOException | InvalidConfigurationException e) {
-                e.printStackTrace();
-            }
+        try {
+            load(file);
+        }
+        catch (IOException | InvalidConfigurationException e) {
+            e.printStackTrace();
         }
     }
 

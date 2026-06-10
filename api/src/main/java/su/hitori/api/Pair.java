@@ -1,7 +1,5 @@
 package su.hitori.api;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.Map;
 import java.util.function.Function;
 
@@ -12,7 +10,7 @@ import java.util.function.Function;
  * @param <A> first object type
  * @param <B> second object type
  */
-public record Pair<A, B>(@NotNull A first, @NotNull B second) {
+public record Pair<A, B>(A first, B second) {
 
     /**
      * Maps both objects to another Pair
@@ -27,7 +25,7 @@ public record Pair<A, B>(@NotNull A first, @NotNull B second) {
     }
 
     @Override
-    public @NotNull String toString() {
+    public String toString() {
         return first + " " + second;
     }
 

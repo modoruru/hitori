@@ -1,15 +1,21 @@
 package su.hitori.plugin.module.enable;
 
 import org.bukkit.event.Listener;
+import org.jetbrains.annotations.Nullable;
+import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.enable.ListenersRegistrar;
+import su.hitori.api.util.LoggerUtil;
 
 import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Logger;
 
 public final class ListenersRegistrarImpl implements ListenersRegistrar {
+
+    private static final Logger LOGGER = LoggerFactory.instance().create();
 
     public final Set<Listener> listeners = new HashSet<>();
     public boolean frozen = false;
@@ -30,14 +36,14 @@ public final class ListenersRegistrarImpl implements ListenersRegistrar {
         return this;
     }
 
-    private Listener createInstance(Class<? extends Listener> clazz) {
+    private @Nullable Listener createInstance(Class<? extends Listener> clazz) {
         Listener listener;
         try {
             Constructor<? extends Listener> constructor = clazz.getConstructor();
             listener = constructor.newInstance();
         }
-        catch (Throwable ex) {
-            ex.printStackTrace();
+        catch (Throwable exception) {
+            LOGGER.warning(LoggerUtil.exceptionToString(exception));
             return null;
         }
         return listener;

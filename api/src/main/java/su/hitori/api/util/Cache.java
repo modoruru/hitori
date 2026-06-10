@@ -47,7 +47,7 @@ public final class Cache<K, V> {
         }, retainTime, TimeUnit.MILLISECONDS);
     }
 
-    public V put(@NotNull K key, @NotNull V value) {
+    public @Nullable V put(@NotNull K key, @NotNull V value) {
         ValueWrapper<V> wrapper = new ValueWrapper<>(value);
         scheduleRemoveTask(key, wrapper);
 
@@ -58,7 +58,7 @@ public final class Cache<K, V> {
         return previouslyAssociated.value;
     }
 
-    public V get(@NotNull K key) {
+    public @Nullable V get(@NotNull K key) {
         ValueWrapper<V> wrapper = map.get(key);
         if(wrapper == null) return null;
         scheduleRemoveTask(key, wrapper);
@@ -69,7 +69,7 @@ public final class Cache<K, V> {
         return internalRemove(key, false);
     }
 
-    private V internalRemove(K key, boolean autoRemove) {
+    private @Nullable V internalRemove(K key, boolean autoRemove) {
         ValueWrapper<V> wrapper = map.get(key);
         if(wrapper == null) return null;
         if(!autoRemove)
