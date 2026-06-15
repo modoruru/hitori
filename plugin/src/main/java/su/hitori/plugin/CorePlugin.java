@@ -6,6 +6,7 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import su.hitori.api.Hitori;
+import su.hitori.api.HitoriHolder;
 import su.hitori.api.ServerCoreInfo;
 import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.ModuleRepository;
@@ -19,32 +20,24 @@ import java.nio.file.Path;
 
 public final class CorePlugin extends JavaPlugin implements Hitori {
 
-    private final LoggerFactory loggerFactory = new LoggerFactoryImpl();
-    private final ModuleRepositoryImpl moduleRepository = new ModuleRepositoryImpl(this);
+    private final LoggerFactory loggerFactory;
+    private final ModuleRepositoryImpl moduleRepository;
     private final ServerCoreInfo serverCoreInfo = new ServerCoreInfoImpl();
 
-    private HitoriConfiguration configuration;
+    CorePlugin(LoggerFactory loggerFactory, ModuleRepositoryImpl moduleRepository) {
+        this.loggerFactory = loggerFactory;
+        this.moduleRepository = moduleRepository;
+        moduleRepository.corePlugin(this);
+    }
 
     @Override
     public void onEnable() {
         Path configPath = getDataPath().resolve("config/").resolve("config.yml");
         configPath.toFile().getParentFile().mkdirs();
-        configuration = new HitoriConfiguration(configPath);
+        HitoriConfiguration configuration = new HitoriConfiguration(configPath);
         configuration.reload();
 
         ServicesManager servicesManager = Bukkit.getServicesManager();
-        servicesManager.register(
-                Hitori.class,
-                this,
-                this,
-                ServicePriority.Highest
-        );
-        servicesManager.register(
-                LoggerFactory.class,
-                loggerFactory,
-                this,
-                ServicePriority.Highest
-        );
         servicesManager.register(
                 Messages.class,
                 new MessagesImpl(configuration),
@@ -52,11 +45,13 @@ public final class CorePlugin extends JavaPlugin implements Hitori {
                 ServicePriority.Highest
         );
 
+        HitoriHolder.set(this);
+
         new HitoriCommand(this).register(this);
 
         loadOtherAPIImplementations();
 
-        moduleRepository.load(getDataFolder());
+        moduleRepository.enableAll();
     }
 
     private void loadOtherAPIImplementations() {

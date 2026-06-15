@@ -1,11 +1,14 @@
 package su.hitori.plugin.module;
 
+import io.papermc.paper.plugin.bootstrap.BootstrapContext;
 import io.papermc.paper.plugin.provider.classloader.ConfiguredPluginClassLoader;
 import io.papermc.paper.plugin.provider.classloader.PluginClassLoaderGroup;
 import net.kyori.adventure.key.Key;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
+import su.hitori.api.logging.LoggerFactory;
+import su.hitori.api.module.ModuleBootstrap;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.module.ModuleRepository;
 import su.hitori.api.util.LoggerUtil;
@@ -19,13 +22,14 @@ import java.util.logging.Logger;
 
 public final class ModuleRepositoryImpl implements ModuleRepository {
 
-    private final CorePlugin corePlugin;
-    private final Logger logger;
+    private @Nullable CorePlugin corePlugin;
+    private final Logger logger = LoggerFactory.instance().create();
     private final Pipeline<ModuleDescriptorImpl> descriptors = new Pipeline<>();
 
-    public ModuleRepositoryImpl(CorePlugin corePlugin) {
-        this.corePlugin = corePlugin;
-        this.logger = corePlugin.loggerFactory().create(ModuleRepository.class);
+    public void corePlugin(CorePlugin corePlugin) {
+        if(this.corePlugin == null && corePlugin != null) {
+            this.corePlugin = corePlugin;
+        }
     }
 
     @Nullable Class<?> loadModuleSpecificClass(ModuleDescriptorImpl requestSource, String name, boolean resolve) {
@@ -62,6 +66,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
     @SuppressWarnings("UnstableApiUsage")
     private void enablePaperAccessHook() {
         // this code is a temporary solution and should probably be replaced with a more robust
+        assert corePlugin != null;
         if(!(corePlugin.getClass().getClassLoader() instanceof ConfiguredPluginClassLoader paperPluginClassLoader)) {
             logger.warning("failed to initialize paper access hook: class loader is not an instance of PaperPluginClassLoader");
             return;
@@ -84,9 +89,8 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         }
     }
 
-    public void load(File folder) {
-        enablePaperAccessHook();
-
+    @SuppressWarnings("UnstableApiUsage")
+    public void bootstrap(File folder, BootstrapContext context) {
         File[] files = folder.listFiles();
         if(files == null) return;
 
@@ -94,7 +98,11 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
             loadSingle(file);
         }
 
-        enableAll();
+        descriptors.forEach(descriptor -> {
+            Optional<ModuleBootstrap> optBootstrap = descriptor.createModuleBoostrap();
+            if(optBootstrap.isEmpty()) return;
+            optBootstrap.get().bootstrap(context);
+        });
     }
 
     void loadSingle(File moduleJarFile) {
@@ -108,8 +116,8 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
 
         ModuleDescriptorImpl descriptor;
         try {
-            descriptor = new ModuleDescriptorImpl(corePlugin, this);
-            descriptor.reload(moduleJarFile, false, Set.of());
+            descriptor = new ModuleDescriptorImpl(this);
+            descriptor.initializeJar(moduleJarFile);
         }
         catch (Throwable exception) {
             logger.warning(LoggerUtil.exceptionToString(exception));
@@ -119,7 +127,13 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         descriptors.addLast(descriptor.key(), descriptor);
     }
 
-    void enableAll() {
+    public void enableAll() {
+        enablePaperAccessHook();
+
+        descriptors.forEach(descriptor -> {
+            descriptor.reload(descriptor.getJar(), false, Set.of());
+            descriptor.corePlugin(corePlugin);
+        });
         descriptors.forEach(ModuleDescriptorImpl::setupCompatibility);
 
         descriptors.sort((first, second) -> {

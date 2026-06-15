@@ -9,6 +9,7 @@ import org.bukkit.event.Listener;
 import org.jetbrains.annotations.Nullable;
 import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.Module;
+import su.hitori.api.module.ModuleBootstrap;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.module.enable.EnableContext;
 import su.hitori.api.util.LoggerUtil;
@@ -19,6 +20,7 @@ import su.hitori.plugin.module.enable.CommandsRegistrarImpl;
 import su.hitori.plugin.module.enable.ListenersRegistrarImpl;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -46,7 +48,7 @@ Work pipeline explanation
 public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     private static final Logger logger = LoggerFactory.instance().create();
-    private final CorePlugin corePlugin;
+    private @Nullable CorePlugin corePlugin;
     private final ModuleRepositoryImpl moduleRepository;
 
     private @Nullable Key key;
@@ -60,14 +62,15 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     private @Nullable CompatibilityLayerImpl compatibilityLayer;
 
     private @Nullable EnableContext lastEnableContext;
+    private final Set<ModuleDescriptorImpl> injected = new HashSet<>();
+    private boolean bootstrapClassloaderSkip = true;
     private boolean enabling;
     private boolean enabled;
     private boolean loaded; // is jar loaded or not
     private boolean enabledOnce;
     private boolean compatibilitySetUp;
 
-    public ModuleDescriptorImpl(CorePlugin corePlugin, ModuleRepositoryImpl moduleRepository) {
-        this.corePlugin = corePlugin;
+    public ModuleDescriptorImpl(ModuleRepositoryImpl moduleRepository) {
         this.moduleRepository = moduleRepository;
     }
 
@@ -164,6 +167,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             commandsRegistrar.frozen = true;
 
             for (Listener listener : listenersRegistrar.listeners) {
+                assert corePlugin != null;
                 Bukkit.getPluginManager().registerEvents(listener, corePlugin);
             }
 
@@ -258,8 +262,8 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     @Override
     public File getFolder() {
-        assert key != null;
-        return new File(corePlugin.getDataFolder(), key.asString().replace(':', '_'));
+        assert currentJar != null && key != null;
+        return new File(currentJar.getParentFile(), key.asString().replace(':', '_'));
     }
 
     public Optional<List<Key>> getReloadAffectedModules() {
@@ -276,11 +280,26 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         );
     }
 
-    public void reload(File jar, boolean autoEnable, Set<ModuleDescriptorImpl> skipReloadIfInjected) {
-        if(enabled) disable();
+    public Optional<ModuleBootstrap> createModuleBoostrap() {
+        assert extendedMeta != null && classLoader != null;
+        if(extendedMeta.bootstrapClass() == null) return Optional.empty();
 
-        logger.info("Loading module from " + jar.getName());
+        try {
+            Class<?> mainClass = classLoader.loadClass(extendedMeta.bootstrapClass());
+            Constructor<?> constructor = mainClass.getConstructor();
+            Object instance = constructor.newInstance();
+            if(!(instance instanceof ModuleBootstrap moduleBootstrap)) throw new IllegalStateException("created instance is not a ModuleBootstrap");
+            return Optional.of(moduleBootstrap);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    void corePlugin(CorePlugin corePlugin) {
+        this.corePlugin = corePlugin;
+    }
+
+    void initializeJar(File jar) {
         ExtendedMeta meta;
         Key newKey;
         try {
@@ -293,7 +312,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         boolean first = key == null;
 
-        final Set<ModuleDescriptorImpl> injected = new HashSet<>();
+        injected.clear();
         if(!first) {
             if(!newKey.equals(key))
                 throw new IllegalStateException("Different keys in jars! Current: " + key.asString() + ", Present: " + newKey.asString());
@@ -313,8 +332,6 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             throw new IllegalStateException("Module under this key already registered");
         }
 
-        injected.removeAll(skipReloadIfInjected);
-
         key = newKey;
         extendedMeta = meta;
         currentJar = jar;
@@ -331,6 +348,21 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             throw new RuntimeException(e);
         }
 
+        if(bootstrapClassloaderSkip)
+            bootstrapClassloaderSkip = false;
+    }
+
+    public void reload(File jar, boolean autoEnable, Set<ModuleDescriptorImpl> skipReloadIfInjected) {
+        if(enabled) disable();
+
+        logger.info("Loading module from " + jar.getName());
+
+        if(!bootstrapClassloaderSkip)
+            initializeJar(jar);
+
+        injected.removeAll(skipReloadIfInjected);
+
+        assert classLoader != null;
         moduleInstance = classLoader.create();
         listenersRegistrar = new ListenersRegistrarImpl();
         commandsRegistrar = new CommandsRegistrarImpl();

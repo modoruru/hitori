@@ -1,12 +1,7 @@
 package su.hitori.api;
 
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.RegisteredServiceProvider;
-import org.jetbrains.annotations.Nullable;
 import su.hitori.api.module.ModuleRepository;
-
-import java.util.Optional;
 
 /**
  * hitori framework api
@@ -19,9 +14,7 @@ public interface Hitori {
      */
     @SuppressWarnings("DataFlowIssue")
     static Hitori instance() {
-        return Optional.ofNullable(Bukkit.getServer().getServicesManager().getRegistration(Hitori.class))
-                .map(RegisteredServiceProvider::getProvider)
-                .orElse(null);
+        return HitoriHolder.instance;
     }
 
     /**

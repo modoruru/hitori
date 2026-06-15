@@ -1,6 +1,7 @@
 package su.hitori.plugin.module;
 
 import net.kyori.adventure.key.Key;
+import org.jetbrains.annotations.Nullable;
 import su.hitori.api.Version;
 import su.hitori.api.module.ModuleMeta;
 
@@ -13,7 +14,7 @@ import java.util.Properties;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-record ExtendedMeta(String mainClass, String packageName, Key key, Version version, String description) {
+record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, String packageName, Key key, Version version, String description) {
 
     public ModuleMeta toModuleMeta() {
         return new ModuleMeta(key, version, description);
@@ -36,6 +37,7 @@ record ExtendedMeta(String mainClass, String packageName, Key key, Version versi
                 String version = properties.getProperty("version");
                 String description = properties.getProperty("description", "");
                 String mainClass = properties.getProperty("main");
+                String bootstrapClass = properties.getProperty("bootstrap");
                 String packageName = properties.getProperty("package");
 
                 if(key == null) throw new IllegalStateException("hitori.properties missing \"key\" key!");
@@ -43,7 +45,7 @@ record ExtendedMeta(String mainClass, String packageName, Key key, Version versi
                 if(mainClass == null) throw new IllegalStateException("hitori.properties missing \"main\" key!");
                 if(packageName == null) throw new IllegalStateException("hitori.properties missing \"package\" key!");
 
-                return new ExtendedMeta(mainClass, packageName, Key.key(key), new Version(version), description);
+                return new ExtendedMeta(mainClass, bootstrapClass, packageName, Key.key(key), new Version(version), description);
             }
         }
         catch (Throwable e) {
