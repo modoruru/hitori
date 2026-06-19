@@ -372,7 +372,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         callIncomingHooks();
     }
 
-    // todo: enableフックの呼び出し方法を変更する。CompletableFutureはあまり適切な選択肢ではないため。
+    // todo: change how the enable hooks is called as CompletableFuture for finishing is not a very good option here.
     void callIncomingHooks() {
         moduleRepository.callEnableHooks(key);
         assert lastEnableContext != null;
