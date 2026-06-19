@@ -120,12 +120,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         return compatibilitySetUp = true;
     }
-
     void enable() {
-        enable(true, null);
-    }
-
-    void enable(boolean callIncomingHooks, Key ignoreOurHookFor) {
         if(!loaded || enabled || enabling) return;
         try {
             assert key != null;
@@ -177,26 +172,6 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                 }
             }, 1L);
 
-            for (Map.Entry<Key, Runnable> entry : compatibilityLayer.enableHooks.entrySet()) {
-                Key key = entry.getKey();
-                if(ignoreOurHookFor != null && key.compareTo(ignoreOurHookFor) == 0) continue;
-
-                moduleRepository.getModule(key).ifPresent(descriptor -> {
-                    if(descriptor.isEnabled()) {
-                        try {
-                            entry.getValue().run();
-                        }
-                        catch (Throwable exception) {
-                            logger.warning(LoggerUtil.exceptionToString(exception));
-                        }
-                    }
-                });
-            }
-
-            if(callIncomingHooks) {
-                moduleRepository.callEnableHooks(key);
-                context.enableHooksFuture().complete(null);
-            }
 
             enabling = false;
             enabled = true;
@@ -380,15 +355,48 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             descriptor.reload(descriptor.getJar(), false, injected);
         }
 
-        enable(false, null);
+        enable();
 
         for (ModuleDescriptorImpl descriptor : injected) {
-            descriptor.enable(true, key);
+            descriptor.enable();
         }
 
+        assert this.key != null;
+
+        for (ModuleDescriptorImpl descriptor : injected) {
+            descriptor.callOutcomingHooks(key);
+            descriptor.callIncomingHooks();
+        }
+
+        callOutcomingHooks(null);
+        callIncomingHooks();
+    }
+
+    // todo: enableフックの呼び出し方法を変更する。CompletableFutureはあまり適切な選択肢ではないため。
+    void callIncomingHooks() {
         moduleRepository.callEnableHooks(key);
         assert lastEnableContext != null;
         lastEnableContext.enableHooksFuture().complete(null);
+    }
+
+    void callOutcomingHooks(Key ignore) {
+        assert compatibilityLayer != null;
+
+        for (Map.Entry<Key, Runnable> entry : compatibilityLayer.enableHooks.entrySet()) {
+            Key key = entry.getKey();
+            if(ignore != null && key.compareTo(ignore) == 0) continue;
+
+            moduleRepository.getModule(key).ifPresent(hookedDescriptor -> {
+                if(hookedDescriptor.isEnabled()) {
+                    try {
+                        entry.getValue().run();
+                    }
+                    catch (Throwable exception) {
+                        logger.warning(LoggerUtil.exceptionToString(exception));
+                    }
+                }
+            });
+        }
     }
 
     public @Nullable File getJar() {

@@ -144,6 +144,11 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         });
 
         descriptors.forEach(ModuleDescriptorImpl::enable);
+
+        for (ModuleDescriptorImpl descriptor : descriptors) {
+            descriptor.callOutcomingHooks(null);
+            descriptor.callIncomingHooks();
+        }
     }
 
     public void disableAll() {
