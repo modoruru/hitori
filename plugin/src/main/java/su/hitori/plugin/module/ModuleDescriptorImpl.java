@@ -67,7 +67,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     private boolean enabling;
     private boolean enabled;
     private boolean loaded; // is jar loaded or not
-    private boolean enabledOnce;
+    boolean enabledOnce;
     private boolean compatibilitySetUp;
 
     public ModuleDescriptorImpl(ModuleRepositoryImpl moduleRepository) {
@@ -327,7 +327,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             bootstrapClassloaderSkip = false;
     }
 
-    public void reload(File jar, boolean autoEnable, Set<ModuleDescriptorImpl> skipReloadIfInjected) {
+    public void reload(File jar, boolean autoEnable, boolean reloadInjected, Set<ModuleDescriptorImpl> skipReloadIfInjected) {
         if(enabled) disable();
 
         logger.info("Loading module from " + jar.getName());
@@ -346,14 +346,16 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         loaded = true;
 
         // FUCK COMMAND API - POOREST SHIT IN THE WORLD
-        if(injected.isEmpty()) {
+        if(injected.isEmpty() || !reloadInjected) {
             if(autoEnable) enable();
             return;
         }
 
         for (ModuleDescriptorImpl descriptor : injected) {
-            descriptor.reload(descriptor.getJar(), false, injected);
+            descriptor.reload(descriptor.getJar(), false, true, injected);
         }
+
+        if(!autoEnable) return;
 
         enable();
 

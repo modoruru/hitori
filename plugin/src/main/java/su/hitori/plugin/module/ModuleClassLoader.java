@@ -42,7 +42,7 @@ final class ModuleClassLoader extends URLClassLoader implements ModuleInitialize
 
     Module create() {
         try {
-            Class<?> mainClass = loadClass(extendedMeta.mainClass());
+            Class<?> mainClass = loadClass(extendedMeta.mainClass(), true);
             Constructor<?> constructor = mainClass.getConstructor();
             Object instance = constructor.newInstance();
             if(!(instance instanceof Module module)) throw new IllegalStateException("created instance is not a Module");

@@ -188,7 +188,7 @@ final class HitoriCommand extends CommandAPICommand {
                 return;
             }
         }
-        impl.reload(impl.getJar(), true, Set.of());
+        impl.reload(impl.getJar(), true, true, Set.of());
         sender.sendMessage(Messages.INFO.create("Module successfully reloaded."));
     }
 

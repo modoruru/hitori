@@ -12,7 +12,6 @@ import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.ModuleRepository;
 import su.hitori.api.util.Messages;
 import su.hitori.plugin.container.ContainerListener;
-import su.hitori.plugin.logging.LoggerFactoryImpl;
 import su.hitori.plugin.module.ModuleRepositoryImpl;
 import su.hitori.plugin.util.MessagesImpl;
 

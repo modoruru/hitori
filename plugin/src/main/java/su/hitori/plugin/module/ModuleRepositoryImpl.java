@@ -131,7 +131,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         enablePaperAccessHook();
 
         descriptors.forEach(descriptor -> {
-            descriptor.reload(descriptor.getJar(), false, Set.of());
+            descriptor.reload(descriptor.getJar(), false, false, Set.of());
             descriptor.corePlugin(corePlugin);
         });
         descriptors.forEach(ModuleDescriptorImpl::setupCompatibility);
