@@ -386,11 +386,12 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         for (Map.Entry<Key, Runnable> entry : compatibilityLayer.enableHooks.entrySet()) {
             Key key = entry.getKey();
-            if(ignore != null && key.compareTo(ignore) == 0) continue;
+            if(ignore != null && key.compareTo(ignore) == 0 || compatibilityLayer.triggered.contains(key)) continue;
 
             moduleRepository.getModule(key).ifPresent(hookedDescriptor -> {
                 if(hookedDescriptor.isEnabled()) {
                     try {
+                        compatibilityLayer.triggered.add(key);
                         entry.getValue().run();
                     }
                     catch (Throwable exception) {

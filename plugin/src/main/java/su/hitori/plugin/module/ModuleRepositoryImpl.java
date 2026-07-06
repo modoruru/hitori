@@ -14,6 +14,7 @@ import su.hitori.api.module.ModuleRepository;
 import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Pipeline;
 import su.hitori.plugin.CorePlugin;
+import su.hitori.plugin.module.compatibility.CompatibilityLayerImpl;
 
 import java.io.File;
 import java.util.Optional;
@@ -51,10 +52,12 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
             assert descriptor != null && descriptor.getCompatibilityLayer() != null;
             if(!descriptor.isEnabled() || descriptor.key().equals(enabled)) continue;
 
-            Runnable runnable = descriptor.getCompatibilityLayer().enableHooks.get(enabled);
-            if(runnable == null) continue;
+            CompatibilityLayerImpl layer = descriptor.getCompatibilityLayer();
+            Runnable runnable;
+            if(layer.triggered.contains(enabled) || (runnable = layer.enableHooks.get(enabled)) == null) continue;
 
             try {
+                layer.triggered.add(enabled);
                 runnable.run();
             }
             catch (Throwable exception) {
@@ -146,7 +149,6 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         descriptors.forEach(ModuleDescriptorImpl::enable);
 
         for (ModuleDescriptorImpl descriptor : descriptors) {
-            descriptor.callOutcomingHooks(null);
             descriptor.callIncomingHooks();
         }
     }

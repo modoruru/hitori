@@ -13,6 +13,7 @@ public final class CompatibilityLayerImpl implements CompatibilityLayer {
 
     public final Set<Key> required = new HashSet<>();
     public final Map<Key, Runnable> enableHooks = new HashMap<>();
+    public final Set<Key> triggered = new HashSet<>();
     public boolean frozen;
 
     @Override
