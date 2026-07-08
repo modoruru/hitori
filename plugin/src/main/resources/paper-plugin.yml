@@ -3,6 +3,7 @@ version: $version
 main: su.hitori.plugin.CorePlugin
 bootstrapper: su.hitori.plugin.CorePluginBootstrap
 api-version: '1.21'
+folia-supported: true
 dependencies:
   server:
     CommandAPI:
