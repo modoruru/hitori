@@ -1,6 +1,5 @@
 package su.hitori.api.util;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -34,7 +33,7 @@ public final class Cache<K, V> {
         }
     }
 
-    public static <K, V> Builder<K, V> builder(@NotNull ScheduledExecutorService scheduledExecutorService) {
+    public static <K, V> Builder<K, V> builder(ScheduledExecutorService scheduledExecutorService) {
         return new Builder<>(scheduledExecutorService);
     }
 
@@ -48,7 +47,19 @@ public final class Cache<K, V> {
         }, retainTime, TimeUnit.MILLISECONDS);
     }
 
-    public @Nullable V put(@NotNull K key, @NotNull V value) {
+    public boolean containsKey(K key) {
+        return map.containsKey(key);
+    }
+
+    public boolean containsValue(V value) {
+        for (ValueWrapper<V> wrapper : map.values()) {
+            if(wrapper.value == value || value.equals(wrapper.value)) return true;
+        }
+
+        return false;
+    }
+
+    public @Nullable V put(K key, V value) {
         ValueWrapper<V> wrapper = new ValueWrapper<>(value);
         scheduleRemoveTask(key, wrapper);
 
@@ -60,14 +71,14 @@ public final class Cache<K, V> {
         return previouslyAssociated.value;
     }
 
-    public @Nullable V get(@NotNull K key) {
+    public @Nullable V get(K key) {
         ValueWrapper<V> wrapper = map.get(key);
         if(wrapper == null) return null;
         scheduleRemoveTask(key, wrapper);
         return wrapper.value;
     }
 
-    public @Nullable V remove(@NotNull K key) {
+    public @Nullable V remove(K key) {
         return internalRemove(key, false);
     }
 
@@ -92,6 +103,10 @@ public final class Cache<K, V> {
     }
 
     public void clear() {
+        for (ValueWrapper<V> wrapper : map.values()) {
+            if(wrapper.removeTask != null)
+                wrapper.removeTask.cancel(true);
+        }
         map.clear();
     }
 

@@ -2,6 +2,7 @@ package su.hitori.api.util;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -40,6 +41,10 @@ public final class SafeUtil {
 
     public static @Nullable Boolean parseBoolean(String string) {
         return wrapParse(Boolean::parseBoolean, string);
+    }
+
+    public static @Nullable UUID parseUUID(String string) {
+        return wrapParse(UUID::fromString, string);
     }
 
     private static <E> @Nullable E wrapParse(Function<String, E> parseFunction, String string) {
