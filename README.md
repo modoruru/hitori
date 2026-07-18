@@ -62,3 +62,8 @@ dependencies {
 }
 ```
 </details>
+
+## Credits
+[justlofe](https://github.com/justlofe) - lead developer and maintainer\
+[StreamVersus](https://github.com/StreamVersus) - wrote several utils\
+[suiteark](https://github.com/suiteark) - stress tester for stability testing
