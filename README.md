@@ -1,22 +1,21 @@
 # ひとり
-hitori - "alone" from japanese
+hitori - "alone" (adverb) from japanese
 
-Hitori is minecraft server-side framework based on PaperMC plugin.\
-The main goal of *hitori* is to implement reloadable modules to simplify and speed up development process.
+hitori is a server-side framework for Minecraft based on the PaperMC plugin.\
+The main goal of *hitori* is to implement reloadable modules to simplify and speed up the development process.
 
 ## How it works?
 The main problem with reloading in Java is removing old classes from runtime.
-This problem can be solved by creating new ClassLoader each time module loads, and removing it before reloading.\
+This problem can be solved by creating new ClassLoader each time module loads, and removing old one before reloading.\
 
 Of course, anything loaded and registered by module in runtime must be disabled/unregistered before removing classes from RAM.\
 This is what *hitori* tries to do by providing an API for registering such things.
 
 ## Main features
 - Modules
-- Safe bukkit listeners and commands (via CommandAPI) registration
-- Registries for custom content
-- Many utils
-- Logging system with modules support
+- Safe bukkit listeners and commands (via [CommandAPI](https://github.com/CommandAPI/CommandAPI)) registration
+- More convenient logging system for modules
+- Many utils regarding I/O, tasks scheduling with [Folia](https://github.com/PaperMC/Folia) support, creating YAML configurations, etc.
 
 ## Usage
 You can get a jar from [Actions](https://github.com/modoruru/hitori/actions) tab. hitori is built almost every commit.\
@@ -25,7 +24,7 @@ Also, you can get module from [Releases](https://github.com/modoruru/hitori/rele
 After downloading the jar, just put it into plugins folder.
 
 ## API
-hitori is published via [JitPack](https://jitpack.io). Latest version: [![](https://jitpack.io/v/modoruru/hitori.svg)](https://jitpack.io/#modoruru/hitori)
+hitori's API is published via [JitPack](https://jitpack.io). Latest version: [![](https://jitpack.io/v/modoruru/hitori.svg)](https://jitpack.io/#modoruru/hitori)
 <details>
 <summary>maven</summary>
 
