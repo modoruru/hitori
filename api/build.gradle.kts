@@ -7,9 +7,7 @@ plugins {
 
 dependencies {
     paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
-    api("com.h2database:${property("h2_version")}")
     api("org.json:json:${property("json_version")}")
-    api("com.github.justlofe:${property("fastbytes_version")}")
     api("net.elytrium:serializer:${property("serializer_version")}")
     api("dev.jorel:commandapi-paper-core:${property("commandapi_version")}")
 }
@@ -36,18 +34,8 @@ publishing {
 
             pom {
                 withXml {
-                    val repositoriesNode = asNode().appendNode("repositories")
-
-                    val jitpackRepo = repositoriesNode.appendNode("repository")
-                    jitpackRepo.appendNode("id", "jitpack.io")
-                    jitpackRepo.appendNode("url", "https://jitpack.io")
-
-
                     val dependenciesNode = asNode().appendNode("dependencies")
-
-                    addDependency(dependenciesNode, "com.h2database", "h2", property("h2_version"))
                     addDependency(dependenciesNode, "org.json", "json", property("json_version"))
-                    addDependency(dependenciesNode, "com.github.justlofe", "FastBytes", property("fastbytes_version"))
                     addDependency(dependenciesNode, "net.elytrium", "serializer", property("serializer_version"))
                     addDependency(dependenciesNode, "dev.jorel", "commandapi-paper-core", property("commandapi_version"))
                 }
