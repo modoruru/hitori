@@ -1,29 +1,22 @@
+import groovy.util.Node
+
 plugins {
     id("io.papermc.paperweight.userdev")
-    id("com.gradleup.shadow")
     id("maven-publish")
 }
 
 dependencies {
     paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
-    api("com.h2database:h2:2.4.240")
-    api("org.json:json:20250517")
-    api("com.github.justlofe:FastBytes:1.0")
-    api("net.elytrium:serializer:1.1.1")
+    api("com.h2database:${property("h2_version")}")
+    api("org.json:json:${property("json_version")}")
+    api("com.github.justlofe:${property("fastbytes_version")}")
+    api("net.elytrium:serializer:${property("serializer_version")}")
+    api("dev.jorel:commandapi-paper-core:${property("commandapi_version")}")
 }
 
 tasks {
     jar {
         archiveBaseName.set("hitori-api")
-        enabled = false
-    }
-
-    shadowJar {
-        archiveClassifier.set("")
-    }
-
-    build {
-        dependsOn(shadowJar)
     }
 
     val sourcesJar by registering(Jar::class) {
@@ -38,9 +31,35 @@ publishing {
             artifactId = rootProject.name
             version = rootProject.version.toString()
 
-            artifact(tasks.named("shadowJar"))
-
+            artifact(tasks.named("jar"))
             artifact(tasks.named("sourcesJar"))
+
+            pom {
+                withXml {
+                    val repositoriesNode = asNode().appendNode("repositories")
+
+                    val jitpackRepo = repositoriesNode.appendNode("repository")
+                    jitpackRepo.appendNode("id", "jitpack.io")
+                    jitpackRepo.appendNode("url", "https://jitpack.io")
+
+
+                    val dependenciesNode = asNode().appendNode("dependencies")
+
+                    addDependency(dependenciesNode, "com.h2database", "h2", property("h2_version"))
+                    addDependency(dependenciesNode, "org.json", "json", property("json_version"))
+                    addDependency(dependenciesNode, "com.github.justlofe", "FastBytes", property("fastbytes_version"))
+                    addDependency(dependenciesNode, "net.elytrium", "serializer", property("serializer_version"))
+                    addDependency(dependenciesNode, "dev.jorel", "commandapi-paper-core", property("commandapi_version"))
+                }
+            }
         }
     }
+}
+
+fun addDependency(parent: Node, groupId: String, artifactId: String, version: Any?) {
+    val dependency = parent.appendNode("dependency")
+    dependency.appendNode("groupId", groupId)
+    dependency.appendNode("artifactId", artifactId)
+    dependency.appendNode("version", version as String)
+    dependency.appendNode("scope", "compile")
 }

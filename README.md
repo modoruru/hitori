@@ -25,6 +25,10 @@ After downloading the jar, just put it into plugins folder.
 
 ## API
 hitori's API is published via [JitPack](https://jitpack.io). Latest version: [![](https://jitpack.io/v/modoruru/hitori.svg)](https://jitpack.io/#modoruru/hitori)
+
+> [!NOTE]
+> We DO NOT include Paper API in our .pom, so you should add it by yourself.
+
 <details>
 <summary>maven</summary>
 
