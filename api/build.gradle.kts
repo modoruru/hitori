@@ -9,7 +9,6 @@ dependencies {
     paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     api("org.json:json:${property("json_version")}")
     api("net.elytrium:serializer:${property("serializer_version")}")
-    api("dev.jorel:commandapi-paper-core:${property("commandapi_version")}")
 }
 
 tasks {
