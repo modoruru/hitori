@@ -89,23 +89,12 @@ public final class HitoriConfiguration<C extends ConfigurationScheme> implements
         @Nullable Object get(Field.FieldInfo fieldInfo) {
             synchronized (lock) {
                 assert rawData != null;
-                List<Field.FieldInfo> path = new ArrayList<>();
 
-                Field.FieldInfo nodeInPath = fieldInfo;
-                while (nodeInPath.parentField() != null) {
-                    path.add(nodeInPath);
-                    nodeInPath = nodeInPath.parentField();
-                }
-
-                Collections.reverse(path);
-
-                for (int i = 0; i < path.size(); i++) {
-                    System.out.printf("[resolve] %s: %s\n", i, path.get(i).name());
-                }
-
+                assert fieldInfo.absolutePath() != null;
+                String[] path = fieldInfo.absolutePath().split("\\.");
                 Map<String, Object> node = rawData;
-                for (int i = 0, length = path.size(); i < length; i++) {
-                    Object rawValue = node.get(path.get(i).name());
+                for (int i = 0, length = path.length; i < length; i++) {
+                    Object rawValue = node.get(path[i]);
                     if(rawValue == null) return null;
 
                     if(i != length - 1) {
@@ -122,7 +111,22 @@ public final class HitoriConfiguration<C extends ConfigurationScheme> implements
 
         void set(Field.FieldInfo fieldInfo, @Nullable Object value) {
             synchronized (lock) {
+                assert rawData != null;
 
+                assert fieldInfo.absolutePath() != null;
+                String[] path = fieldInfo.absolutePath().split("\\.");
+                Map<String, Object> node = rawData;
+                for (int i = 0, length = path.length - 1; i < length; i++) {
+                    String pathPartName = path[i];
+                    Object rawValue = node.get(pathPartName);
+                    if(rawValue == null && value == null) return; // value is null - default and the section is null already - it holds defaults by our definitions
+
+                    if(rawValue == null) node.put(pathPartName, node = new HashMap<>());
+                    else node = UnsafeUtil.cast(rawValue);
+                }
+
+                if(value == null) node.remove(fieldInfo.name());
+                else node.put(fieldInfo.name(), value);
             }
         }
 

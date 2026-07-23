@@ -120,6 +120,6 @@ public final class Field<T> {
         return new Field<>(clazz, genericTypes, defaultValue);
     }
 
-    record FieldInfo(String name, @Nullable FieldInfo parentField) {}
+    record FieldInfo(String name, @Nullable String absolutePath) {}
 
 }

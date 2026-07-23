@@ -1,6 +1,7 @@
 package su.hitori.api.test.config;
 
 import net.kyori.adventure.key.Key;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import su.hitori.api.config.HitoriConfiguration;
 
@@ -17,6 +18,9 @@ public final class ConfigTest {
         ExampleConfiguration access = exampleConfig.access();
         System.out.printf("[check] string value: \"%s\"\n", access.string.get());
         System.out.printf("[check] section.join value: \"%s\"\n", access.section.get().join.get());
+
+        Assertions.assertEquals("string", access.string.get());
+        Assertions.assertEquals("%s joined", access.section.get().join.get());
     }
 
 }

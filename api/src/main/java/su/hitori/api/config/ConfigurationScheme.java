@@ -42,17 +42,13 @@ public abstract class ConfigurationScheme {
     }
 
     void compileAndAssignContext(HitoriConfiguration.Context contextToAssign) {
-        root = compileSectionNode(null, null, getClass(), this, contextToAssign);
+        root = compileSectionNode("", null, null, getClass(), this, contextToAssign);
     }
 
-    Node compileSectionNode(@Nullable String nodeName, @Nullable Field<?> nodeField, Class<?> clazz, Object instance, HitoriConfiguration.Context contextToAssign) {
+    Node compileSectionNode(String absoluteNodeName, @Nullable String nodeName, @Nullable Field<?> nodeField, Class<?> clazz, Object instance, HitoriConfiguration.Context contextToAssign) {
         if((nodeName == null) != (nodeField == null)) throw new InternalException();
 
         Map<String, Node> result = new HashMap<>();
-
-        Field.FieldInfo currentNodeFieldInfo;
-        if(nodeField == null) currentNodeFieldInfo = null;
-        else currentNodeFieldInfo = new Field.FieldInfo(nodeName, null);
 
         for (java.lang.reflect.Field field : clazz.getDeclaredFields()) {
             if(!field.getType().isAssignableFrom(Field.class)) continue;
@@ -75,14 +71,14 @@ public abstract class ConfigurationScheme {
 
             assert configField != null; // because we verify access at the constructor
 
-            configField.assignContextAndInfo(contextToAssign, new Field.FieldInfo(fieldName, currentNodeFieldInfo));
+            configField.assignContextAndInfo(contextToAssign, new Field.FieldInfo(fieldName, absoluteNodeName + '.' + fieldName));
 
             Class<?> configFieldType = configField.type();
             NodeType nodeType = determineType(configFieldType);
 
             Node node = switch (nodeType) {
                 case PRIMITIVE -> new Node(nodeType, configField, null, null);
-                case SECTION -> compileSectionNode(fieldName, configField, configFieldType, configField.defaultValue(), contextToAssign);
+                case SECTION -> compileSectionNode(absoluteNodeName + '.' + fieldName, fieldName, configField, configFieldType, configField.defaultValue(), contextToAssign);
                 case LIST -> null;
             };
             assert node != null;

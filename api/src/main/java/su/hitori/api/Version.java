@@ -1,7 +1,6 @@
 package su.hitori.api;
 
 import io.papermc.paper.ServerBuildInfo;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Describes version based on three numbers: global, major and minor sub-versions
@@ -28,7 +27,7 @@ public final class Version implements Comparable<Version> {
      * @param raw string with version format
      * @throws IllegalArgumentException if malformed string is passed
      */
-    public Version(@NotNull String raw) throws IllegalArgumentException {
+    public Version(String raw) throws IllegalArgumentException {
         if(raw.isEmpty()) throw new IllegalArgumentException("empty string");
         String[] unboxed = raw.split("\\.");
 
@@ -89,7 +88,7 @@ public final class Version implements Comparable<Version> {
     }
 
     @Override
-    public int compareTo(@NotNull Version version) {
+    public int compareTo(Version version) {
         if (this.global != version.global) return Integer.compare(this.global, version.global);
         else if (this.major != version.major) return Integer.compare(this.major, version.major);
         return Integer.compare(this.minor, version.minor);
