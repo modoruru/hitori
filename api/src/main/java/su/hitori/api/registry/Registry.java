@@ -59,17 +59,39 @@ public interface Registry<E extends Keyed> {
     /**
      * Returns an optional element from this registry
      * @param key key of the element
+     * @return wrapped element or empty optional if element under this key is not registered
+     * @deprecated see {@link Registry#optional(Key)}
+     */
+    @Deprecated(since = "1.2.0")
+    Optional<E> getOptional(Key key);
+
+    /**
+     * Returns an optional element from this registry
+     * @param key key of the element
      * @return element or empty if element under this key is not registered
      */
-    Optional<E> getOptional(Key key);
+    default Optional<E> optional(Key key) {
+        return getOptional(key);
+    }
+
+    /**
+     * Applies consumer if element under such key registered in registry.
+     * @param key key of the element
+     * @param consumer consumer to apply
+     * @deprecated see {@link Registry#ifPresent(Key, Consumer)}
+     */
+    @Deprecated(since = "1.2.0")
+    default void consume(Key key, Consumer<E> consumer) {
+        getOptional(key).ifPresent(consumer);
+    }
 
     /**
      * Applies consumer if element under such key registered in registry.
      * @param key key of the element
      * @param consumer consumer to apply
      */
-    default void consume(Key key, Consumer<E> consumer) {
-        getOptional(key).ifPresent(consumer);
+    default void ifPresent(Key key, Consumer<E> consumer) {
+        consume(key, consumer);
     }
 
     /**

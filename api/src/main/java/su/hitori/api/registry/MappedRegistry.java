@@ -8,7 +8,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 /**
- * Basic implementation of registry based on Map
+ * Basic implementation of the registry based on the {@link Map}
  * @param <E> elements type
  */
 public class MappedRegistry<E extends Keyed> implements Registry<E> {
@@ -58,6 +58,11 @@ public class MappedRegistry<E extends Keyed> implements Registry<E> {
 
     @Override
     public Optional<E> getOptional(Key key) {
+        return optional(key);
+    }
+
+    @Override
+    public Optional<E> optional(Key key) {
         return Optional.ofNullable(map.get(key));
     }
 

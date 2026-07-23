@@ -1,5 +1,6 @@
 package su.hitori.api.util.language;
 
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.util.time.TimeUnit;
 
 import java.util.Locale;
@@ -38,7 +39,7 @@ public final class Russian implements Language {
     }
 
     @Override
-    public TimeUnit timeUnitFromLiteral(String literal) {
+    public @Nullable TimeUnit timeUnitFromLiteral(String literal) {
         return switch (literal.toLowerCase(Locale.of("ru", "RU"))) {
             case "мс" -> TimeUnit.MILLISECOND;
             case "сек" -> TimeUnit.SECOND;

@@ -60,6 +60,7 @@ public abstract class Module implements Keyed {
     /**
      * Path to default config file located in module folder
      */
+    @Deprecated(since = "1.2.0")
     public final Path defaultConfig() {
         File folder = this.folder;
         folder.mkdirs();

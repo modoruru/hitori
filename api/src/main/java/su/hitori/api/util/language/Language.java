@@ -1,5 +1,6 @@
 package su.hitori.api.util.language;
 
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.util.time.TimeUnit;
 
 public interface Language {
@@ -10,6 +11,6 @@ public interface Language {
     String defineGrammaticalNumber(String[] variants, int count);
 
     String timeUnitToLiteral(TimeUnit timeUnit);
-    TimeUnit timeUnitFromLiteral(String literal);
+    @Nullable TimeUnit timeUnitFromLiteral(String literal);
 
 }

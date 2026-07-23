@@ -47,7 +47,7 @@ Work pipeline explanation
  */
 public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
-    private static final Logger logger = LoggerFactory.instance().create();
+    private static final Logger logger = LoggerFactory.instance().create(ModuleDescriptor.class);
     private @Nullable CorePlugin corePlugin;
     private final ModuleRepositoryImpl moduleRepository;
 
@@ -337,10 +337,10 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         injected.removeAll(skipReloadIfInjected);
 
-        assert classLoader != null;
+        assert corePlugin != null && classLoader != null;
         moduleInstance = classLoader.create();
         listenersRegistrar = new ListenersRegistrarImpl();
-        commandsRegistrar = new CommandsRegistrarImpl();
+        commandsRegistrar = new CommandsRegistrarImpl(key, logger, corePlugin.serverCoreInfo());
         compatibilityLayer = new CompatibilityLayerImpl();
 
         loaded = true;

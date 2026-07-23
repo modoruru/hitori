@@ -1,5 +1,6 @@
 package su.hitori.api.util.language;
 
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.util.time.TimeUnit;
 
 public final class English implements Language {
@@ -33,7 +34,7 @@ public final class English implements Language {
     }
 
     @Override
-    public TimeUnit timeUnitFromLiteral(String literal) {
+    public @Nullable TimeUnit timeUnitFromLiteral(String literal) {
         return switch (literal.toLowerCase()) {
             case "ms" -> TimeUnit.MILLISECOND;
             case "s" -> TimeUnit.SECOND;
