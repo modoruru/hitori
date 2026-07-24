@@ -1,4 +1,4 @@
-package su.hitori.api.config.exception;
+package su.hitori.api.configuration.exception;
 
 public final class IllegalSchemeException extends IllegalStateException {
 

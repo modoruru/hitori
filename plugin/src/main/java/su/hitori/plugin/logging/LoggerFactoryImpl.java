@@ -26,7 +26,7 @@ public final class LoggerFactoryImpl implements LoggerFactory {
         String namespace;
 
         if(clazz.getClassLoader() instanceof ModuleInitializer moduleInitializer) namespace = moduleInitializer.getModuleMeta().key().value();
-        else if(clazz.getName().startsWith("su.hitori.plugin")) namespace = HITORI;
+        else if(clazz.getName().startsWith("su.hitori.plugin") || clazz.getName().startsWith("su.hitori.api")) namespace = HITORI;
         else namespace = UNKNOWN;
 
         StringBuilder builder = new StringBuilder(namespace);
