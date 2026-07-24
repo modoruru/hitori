@@ -41,7 +41,8 @@ public final class ConfigTest {
     public void testScheme() {
         HitoriConfiguration<ExampleConfiguration> exampleConfig = HitoriConfiguration.create(
                 Key.key("hitori", "example"),
-                new ExampleConfiguration()
+                new ExampleConfiguration(),
+                null
         );
         exampleConfig.defaults();
 
@@ -57,7 +58,8 @@ public final class ConfigTest {
     public void testWrite(@TempDir Path tempDir) throws IOException {
         HitoriConfiguration<ExampleConfiguration> exampleConfig = HitoriConfiguration.create(
                 Key.key("hitori", "example"),
-                new ExampleConfiguration()
+                new ExampleConfiguration(),
+                null
         );
         exampleConfig.defaults();
 
@@ -71,7 +73,8 @@ public final class ConfigTest {
     public void testRead(@TempDir Path tempDir) throws IOException {
         HitoriConfiguration<ExampleConfiguration> exampleConfig = HitoriConfiguration.create(
                 Key.key("hitori", "example"),
-                new ExampleConfiguration()
+                new ExampleConfiguration(),
+                null
         );
         exampleConfig.defaults();
 
