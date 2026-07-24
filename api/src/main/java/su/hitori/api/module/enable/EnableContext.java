@@ -1,5 +1,7 @@
 package su.hitori.api.module.enable;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -9,6 +11,6 @@ import java.util.concurrent.CompletableFuture;
  * @param hasEnabledBefore whether this module was enabled before in this session
  * @param enableHooksFuture called when all enable hooks from other modules are finished
  */
-public record EnableContext(ListenersRegistrar listeners, CommandsRegistrar commands,  boolean hasEnabledBefore, CompletableFuture<Void> enableHooksFuture) {
+public record EnableContext(ListenersRegistrar listeners, CommandsRegistrar commands, ConfigurationsRegistrar configurations, boolean hasEnabledBefore, CompletableFuture<@Nullable Void> enableHooksFuture) {
 
 }

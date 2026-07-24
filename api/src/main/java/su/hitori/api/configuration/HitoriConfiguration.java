@@ -3,14 +3,13 @@ package su.hitori.api.configuration;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
 import org.jspecify.annotations.Nullable;
+import su.hitori.api.configuration.exception.InternalException;
 import su.hitori.api.configuration.serializer.Serializer;
 import su.hitori.api.configuration.serializer.YAMLSerializer;
 import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.util.UnsafeUtil;
 
-import java.io.DataInput;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -19,16 +18,20 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
     private final Key key;
     private final RootScheme rootSectionScheme;
+    private final @Nullable ConfigurationSource configurationSource;
 
     private final Context context;
 
-    private HitoriConfiguration(Key key, RootScheme rootSectionScheme) {
+    private HitoriConfiguration(Key key, RootScheme rootSectionScheme, @Nullable ConfigurationSource configurationSource) {
         this.key = key;
         this.rootSectionScheme = rootSectionScheme;
+        this.configurationSource = configurationSource;
 
         this.context = new Context();
 
         rootSectionScheme.root = SectionScheme.compileSectionNode(context, "", rootSectionScheme.getClass(), rootSectionScheme);
+
+        if(configurationSource != null) readFromSource();
     }
 
     private static void cleanupSectionRecursively(Map<String, Object> rawSection) {
@@ -41,6 +44,65 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
     private static IllegalStateException notLoaded() {
         return new IllegalStateException("Configuration is not loaded yet!");
+    }
+
+    public SectionScheme.Node rootNode() {
+        assert rootSectionScheme.root != null;
+        return rootSectionScheme.root;
+    }
+
+    public boolean hasConfigurationSource() {
+        return configurationSource != null;
+    }
+
+    public void readFromSource() {
+        if(configurationSource == null) throw new IllegalStateException("This HitoriConfiguration doesn't has default configurationSource.");
+        readFromSource(configurationSource);
+    }
+
+    public void readFromSource(ConfigurationSource configurationSource) {
+        synchronized (context.lock) {
+            try {
+                InputStream inputStream;
+                if(configurationSource.file != null) inputStream = new FileInputStream(configurationSource.file);
+                else {
+                    assert configurationSource.inputStreamCreator != null;
+                    inputStream = configurationSource.inputStreamCreator.get();
+                }
+
+                try (inputStream) {
+                    read(configurationSource.serializer, inputStream);
+                }
+            }
+            catch (Exception exception) {
+                throw new InternalException(exception);
+            }
+        }
+    }
+
+    public void writeToSource() {
+        if(configurationSource == null) throw new IllegalStateException("This HitoriConfiguration doesn't has default configurationSource.");
+        writeToSource(configurationSource);
+    }
+
+    public void writeToSource(ConfigurationSource configurationSource) {
+        synchronized (context.lock) {
+            try {
+                OutputStream outputStream;
+                if(configurationSource.file != null) outputStream = new FileOutputStream(configurationSource.file);
+                else {
+                    assert configurationSource.outputStreamCreator != null;
+                    outputStream = configurationSource.outputStreamCreator.get();
+                }
+
+                try (outputStream) {
+                    write(configurationSource.serializer, outputStream);
+                }
+            }
+            catch (Exception exception) {
+                throw new InternalException(exception);
+            }
+        }
     }
 
     /**
@@ -59,6 +121,15 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
     public void readYaml(InputStream input) {
         read(YAMLSerializer.INSTANCE, input);
+    }
+
+    public void readFile(Serializer serializer, File file) {
+        try (FileInputStream inputStream = new FileInputStream(file)) {
+            read(serializer, inputStream);
+        }
+        catch (Exception exception) {
+            throw new InternalException(exception);
+        }
     }
 
     /**
@@ -95,8 +166,8 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
         return rootSectionScheme;
     }
 
-    public static <C extends SectionScheme> HitoriConfiguration<C> create(Key key, C rootSectionScheme) {
-        return new HitoriConfiguration<>(key, rootSectionScheme);
+    public static <C extends SectionScheme> HitoriConfiguration<C> create(Key key, C rootSectionScheme, @Nullable ConfigurationSource configurationSource) {
+        return new HitoriConfiguration<>(key, rootSectionScheme, configurationSource);
     }
 
     @Override
@@ -115,7 +186,6 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
         @Nullable Object get(Field.Info info) {
             synchronized (lock) {
                 assert rawData != null;
-                System.out.printf("[context/get] %s\n", info.absolutePath());
                 return rawData.get(info.absolutePath());
             }
         }

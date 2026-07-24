@@ -58,7 +58,6 @@ public abstract class SectionScheme {
                 );
             }
 
-            System.out.printf("[compile] Added node %s with type %s\n", internalFieldName, node.nodeType.name());
             results.put(internalFieldName, node);
         }
 

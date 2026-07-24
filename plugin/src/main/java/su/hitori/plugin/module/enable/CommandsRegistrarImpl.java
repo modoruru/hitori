@@ -4,25 +4,21 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import dev.jorel.commandapi.CommandAPICommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.kyori.adventure.key.Key;
-import org.slf4j.LoggerFactory;
 import su.hitori.api.ServerCoreInfo;
 import su.hitori.api.module.enable.CommandsRegistrar;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 
 @SuppressWarnings("removal") // "Overrides method that is deprecated and marked for removal" and what, I should remove implementation because of this? screw it
 public final class CommandsRegistrarImpl implements CommandsRegistrar {
 
-    private static final org.slf4j.Logger log = LoggerFactory.getLogger(CommandsRegistrarImpl.class);
     private final Key moduleKey;
     private final Logger logger;
     private final ServerCoreInfo serverCoreInfo;
 
-    public final Set<CommandAPICommand> commands = new HashSet<>();
+    public final Set<CommandAPICommand> oldCommands = new HashSet<>();
+    public final List<LiteralCommandNode<CommandSourceStack>> commands = new ArrayList<>();
     public boolean frozen = false;
 
     public CommandsRegistrarImpl(Key moduleKey, Logger logger, ServerCoreInfo serverCoreInfo) {
@@ -51,7 +47,7 @@ public final class CommandsRegistrarImpl implements CommandsRegistrar {
     public CommandsRegistrar register(Collection<CommandAPICommand> commands) {
         printWarningOrThrowIfFolia();
         if(frozen) return this;
-        this.commands.addAll(commands);
+        this.oldCommands.addAll(commands);
         return this;
     }
 
@@ -59,17 +55,22 @@ public final class CommandsRegistrarImpl implements CommandsRegistrar {
     public CommandsRegistrar register(CommandAPICommand... commands) {
         printWarningOrThrowIfFolia();
         if(frozen) return this;
+        Collections.addAll(this.oldCommands, commands);
+        return this;
+    }
+
+    @SafeVarargs
+    @Override
+    public final CommandsRegistrar register(LiteralCommandNode<CommandSourceStack>... commands) {
+        if(frozen) return this;
         Collections.addAll(this.commands, commands);
         return this;
     }
 
     @Override
-    public CommandsRegistrar register(LiteralCommandNode<CommandSourceStack>... commands) {
-        return this;
-    }
-
-    @Override
     public CommandsRegistrar registerCollection(Collection<LiteralCommandNode<CommandSourceStack>> commands) {
+        if(frozen) return this;
+        this.commands.addAll(commands);
         return this;
     }
 

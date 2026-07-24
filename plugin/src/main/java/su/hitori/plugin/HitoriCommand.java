@@ -1,12 +1,12 @@
 package su.hitori.plugin;
 
-import dev.jorel.commandapi.CommandAPICommand;
-import dev.jorel.commandapi.arguments.Argument;
-import dev.jorel.commandapi.arguments.ArgumentSuggestions;
-import dev.jorel.commandapi.arguments.BooleanArgument;
-import dev.jorel.commandapi.arguments.NamespacedKeyArgument;
-import dev.jorel.commandapi.executors.CommandArguments;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.ServerBuildInfo;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import net.kyori.adventure.key.Key;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
@@ -27,30 +27,23 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.logging.Logger;
 
-final class HitoriCommand extends CommandAPICommand {
+final class HitoriCommand {
 
     private static final Logger LOGGER = LoggerFactory.instance().create();
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("HH:mm dd.MM.yyyy (z)");
 
-    private final CorePlugin corePlugin;
+    private HitoriCommand() {}
 
-    public HitoriCommand(CorePlugin corePlugin) {
-        super("hitori");
-        this.corePlugin = corePlugin;
-
-        withPermission("*");
-        withSubcommands(
-                new CommandAPICommand("reload")
-                        .withArguments(moduleArgument(corePlugin))
-                        .withOptionalArguments(new BooleanArgument("sure"))
-                        .executes(this::reload),
-
-                new CommandAPICommand("modules")
-                        .executes(this::modules),
-
-                new CommandAPICommand("dump")
-                        .executes(this::dump)
-        );
+    public static LiteralCommandNode<CommandSourceStack> boostrap(CorePlugin corePlugin) {
+        return Commands.literal("hitori")
+                .then(Commands.literal("modules")
+                        .executes(context -> modules(corePlugin, context)))
+                .then(Commands.literal("reload")
+                        .then(moduleArgument(corePlugin)
+                                .executes(context -> reload(corePlugin, context))))
+                .then(Commands.literal("dump")
+                        .executes(context -> dump(corePlugin, context)))
+                .build();
     }
 
     private static String formatBytes(long bytes) {
@@ -60,7 +53,7 @@ final class HitoriCommand extends CommandAPICommand {
         return String.format("%.1f %s", bytes / Math.pow(1024, exp), pre);
     }
 
-    private Optional<Pair<String, String>> extractCiCdInfo() {
+    private static Optional<Pair<String, String>> extractCiCdInfo(CorePlugin corePlugin) {
         try (InputStream inputStream = corePlugin.getResource("build-info.properties")) {
             if(inputStream == null) return Optional.empty();
 
@@ -78,10 +71,10 @@ final class HitoriCommand extends CommandAPICommand {
         }
     }
 
-    private void dump(CommandSender sender, CommandArguments args) {
+    private static int dump(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) {
         DumpBuilder builder = new DumpBuilder();
         ModuleRepository moduleRepository = corePlugin.moduleRepository();
-        var ciCdInfo = extractCiCdInfo().orElse(Pair.of("ide", "ide"));
+        var ciCdInfo = extractCiCdInfo(corePlugin).orElse(Pair.of("ide", "ide"));
 
         // plugin info, server info, hardware info
         builder.append("- hitori\n");
@@ -125,14 +118,15 @@ final class HitoriCommand extends CommandAPICommand {
         builder.append("  - hardware\n");
         builder.append("    RAM: ").appendAqua(formatBytes(Runtime.getRuntime().maxMemory()));
 
-        sender.sendMessage(Messages.INFO.create(String.format(
+        context.getSource().getSender().sendMessage(Messages.INFO.create(String.format(
                 "Creating dump...\n%s\n<yellow><click:copy_to_clipboard:'%s'>[click to copy]</yellow>",
                 builder.styledToString(),
                 builder.baseToString()
         )));
+        return 1;
     }
 
-    private void modules(CommandSender sender, CommandArguments args) {
+    private static int modules(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) {
         TreeMap<String, ModuleDescriptor> modules = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (Key key : corePlugin.moduleRepository().keySet()) {
             ModuleDescriptor descriptor = corePlugin.moduleRepository().getModule(key).orElse(null);
@@ -156,17 +150,19 @@ final class HitoriCommand extends CommandAPICommand {
             }
         }
 
-        sender.sendMessage(Messages.INFO.create(builder.toString()));
+        context.getSource().getSender().sendMessage(Messages.INFO.create(builder.toString()));
+        return 1;
     }
 
-    private void reload(CommandSender sender, CommandArguments args) {
-        boolean areUserSure = args.getOrDefaultUnchecked("sure", false);
-        NamespacedKey key = args.getUnchecked("module");
-        assert key != null;
+    private static int reload(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) {
+        CommandSender sender = context.getSource().getSender();
+
+        boolean areUserSure = context.getArgument("sure", Boolean.class);
+        NamespacedKey key = context.getArgument("module", NamespacedKey.class);
         ModuleDescriptor descriptor = corePlugin.moduleRepository().getModule(key).orElse(null);
         if(descriptor == null) {
             sender.sendMessage(Messages.ERROR.text("Module does not exists."));
-            return;
+            return 1;
         }
 
         ModuleDescriptorImpl impl = (ModuleDescriptorImpl) descriptor;
@@ -185,17 +181,20 @@ final class HitoriCommand extends CommandAPICommand {
                         ),
                         key.asString()
                 )));
-                return;
+                return 1;
             }
         }
         impl.reload(impl.getJar(), true, true, Set.of());
         sender.sendMessage(Messages.INFO.create("Module successfully reloaded."));
+
+        return 1;
     }
 
-    private static Argument<NamespacedKey> moduleArgument(CorePlugin corePlugin) {
-        return new NamespacedKeyArgument("module").replaceSuggestions(ArgumentSuggestions.stringCollection(ignored ->
-                corePlugin.moduleRepository().keySet().stream().map(Key::asString).toList()
-        ));
+    private static RequiredArgumentBuilder<CommandSourceStack, NamespacedKey> moduleArgument(CorePlugin corePlugin) {
+        return Commands.argument("module", ArgumentTypes.namespacedKey()).suggests((_, builder) -> {
+            corePlugin.moduleRepository().keySet().stream().map(Key::asString).forEach(builder::suggest);
+            return builder.buildFuture();
+        });
     }
 
 }

@@ -1,5 +1,6 @@
 package su.hitori.plugin.module;
 
+import com.mojang.brigadier.tree.LiteralCommandNode;
 import dev.jorel.commandapi.CommandAPICommand;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
@@ -7,16 +8,20 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.jetbrains.annotations.Nullable;
+import su.hitori.api.HitoriRegistryAccess;
+import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.Module;
 import su.hitori.api.module.ModuleBootstrap;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.module.enable.EnableContext;
+import su.hitori.api.registry.MappedRegistry;
 import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Task;
 import su.hitori.plugin.CorePlugin;
 import su.hitori.plugin.module.compatibility.CompatibilityLayerImpl;
 import su.hitori.plugin.module.enable.CommandsRegistrarImpl;
+import su.hitori.plugin.module.enable.ConfigurationsRegistrarImpl;
 import su.hitori.plugin.module.enable.ListenersRegistrarImpl;
 
 import java.io.File;
@@ -27,6 +32,7 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 /*
 Work pipeline explanation
@@ -59,6 +65,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     private @Nullable Module moduleInstance;
     private @Nullable ListenersRegistrarImpl listenersRegistrar;
     private @Nullable CommandsRegistrarImpl commandsRegistrar;
+    private @Nullable ConfigurationsRegistrarImpl configurationsRegistrar;
     private @Nullable CompatibilityLayerImpl compatibilityLayer;
 
     private @Nullable EnableContext lastEnableContext;
@@ -110,6 +117,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         if(!loaded || enabled || compatibilitySetUp) return true;
         try {
             assert moduleInstance != null;
+            assert compatibilityLayer != null;
             moduleInstance.setupCompatibility(compatibilityLayer);
         }
         catch (Throwable exception) {
@@ -141,11 +149,12 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                 return;
             }
 
-            assert listenersRegistrar != null && commandsRegistrar != null;
+            assert listenersRegistrar != null && commandsRegistrar != null && configurationsRegistrar != null;
             listenersRegistrar.frozen = false;
             commandsRegistrar.frozen = false;
+            configurationsRegistrar.frozen = false;
 
-            EnableContext context = lastEnableContext = new EnableContext(listenersRegistrar, commandsRegistrar, enabledOnce, new CompletableFuture<>());
+            EnableContext context = lastEnableContext = new EnableContext(listenersRegistrar, commandsRegistrar, configurationsRegistrar, enabledOnce, new CompletableFuture<>());
             try {
                 assert moduleInstance != null;
                 moduleInstance.enable(context);
@@ -166,12 +175,20 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                 Bukkit.getPluginManager().registerEvents(listener, corePlugin);
             }
 
-            Task.runGlobally(() -> {
-                for (CommandAPICommand command : commandsRegistrar.commands) {
-                    command.register(corePlugin);
-                }
-            }, 1L);
+            assert corePlugin != null;
+            if(!corePlugin.serverCoreInfo().isFolia()) {
+                Task.runGlobally(() -> {
+                    for (CommandAPICommand command : commandsRegistrar.oldCommands) {
+                        command.register(corePlugin);
+                    }
+                }, 1L);
+            }
 
+            corePlugin.commandRegistryModifier().applyModificationsInBatch(
+                    commandsRegistrar.commands,
+                    Set.of(),
+                    true
+            );
 
             enabling = false;
             enabled = true;
@@ -207,32 +224,42 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             logger.warning(LoggerUtil.exceptionToString(exception));
         }
 
-        assert listenersRegistrar != null && commandsRegistrar != null;
+        assert listenersRegistrar != null && commandsRegistrar != null && corePlugin != null;
         for (Listener listener : listenersRegistrar.listeners) {
             HandlerList.unregisterAll(listener);
         }
 
         // Unregister command aliases
-        Set<String> toUnregister = new HashSet<>();
-        for (CommandAPICommand command : commandsRegistrar.commands) {
-            toUnregister.add(command.getName());
-            toUnregister.addAll(Arrays.asList(command.getAliases()));
+        if(!corePlugin.serverCoreInfo().isFolia()) {
+            Set<String> toUnregister = new HashSet<>();
+            for (CommandAPICommand command : commandsRegistrar.oldCommands) {
+                toUnregister.add(command.getName());
+                toUnregister.addAll(Arrays.asList(command.getAliases()));
+            }
+
+            Task.ensureSync(() -> {
+                try {
+                    Method method = Class.forName("dev.jorel.commandapi.CommandAPI").getDeclaredMethod("unregister", String.class, boolean.class);
+                    for (String command : toUnregister) {
+                        method.invoke(null, command, true);
+                    }
+                }
+                catch (Exception _) {
+                    // ignore stacktrace
+                }
+            });
         }
 
-        Task.ensureSync(() -> {
-            try {
-                Method method = Class.forName("dev.jorel.commandapi.CommandAPI").getDeclaredMethod("unregister", String.class, boolean.class);
-                for (String command : toUnregister) {
-                    method.invoke(null, command, true);
-                }
-            }
-            catch (Exception _) {
-                // ignore stacktrace
-            }
-        });
+        corePlugin.commandRegistryModifier().applyModificationsInBatch(
+                List.of(),
+                commandsRegistrar.commands.stream()
+                        .map(LiteralCommandNode::getLiteral)
+                        .collect(Collectors.toSet()),
+                true
+        );
 
         listenersRegistrar.listeners.clear();
-        commandsRegistrar.commands.clear();
+        commandsRegistrar.oldCommands.clear();
     }
 
     @Override
@@ -337,10 +364,16 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         injected.removeAll(skipReloadIfInjected);
 
-        assert corePlugin != null && classLoader != null;
+        assert corePlugin != null && classLoader != null && key != null;
         moduleInstance = classLoader.create();
         listenersRegistrar = new ListenersRegistrarImpl();
         commandsRegistrar = new CommandsRegistrarImpl(key, logger, corePlugin.serverCoreInfo());
+        if(configurationsRegistrar != null) {
+            for (Key key : configurationsRegistrar.configurations.keySet()) {
+                ((MappedRegistry<HitoriConfiguration<?>>) configurationsRegistrar.registry).remove(key);
+            }
+        }
+        configurationsRegistrar = new ConfigurationsRegistrarImpl(corePlugin.access(HitoriRegistryAccess.CONFIGURATION).orElseThrow());
         compatibilityLayer = new CompatibilityLayerImpl();
 
         loaded = true;
@@ -352,6 +385,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         }
 
         for (ModuleDescriptorImpl descriptor : injected) {
+            assert descriptor.getJar() != null;
             descriptor.reload(descriptor.getJar(), false, true, injected);
         }
 
@@ -376,12 +410,13 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     // todo: change how the enable hooks is called as CompletableFuture for finishing is not a very good option here.
     void callIncomingHooks() {
+        assert key != null;
         moduleRepository.callEnableHooks(key);
         assert lastEnableContext != null;
         lastEnableContext.enableHooksFuture().complete(null);
     }
 
-    void callOutcomingHooks(Key ignore) {
+    void callOutcomingHooks(@Nullable Key ignore) {
         assert compatibilityLayer != null;
 
         for (Map.Entry<Key, Runnable> entry : compatibilityLayer.enableHooks.entrySet()) {

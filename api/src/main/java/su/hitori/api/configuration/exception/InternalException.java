@@ -10,6 +10,10 @@ public final class InternalException extends IllegalStateException {
         super(message);
     }
 
+    public InternalException(Throwable throwable) {
+        super(throwable);
+    }
+
     public static InternalException formatted(String format, Object... args) {
         return new InternalException(String.format(format, args));
     }
