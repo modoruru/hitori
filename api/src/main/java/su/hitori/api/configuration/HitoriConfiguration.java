@@ -157,6 +157,8 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
                 return;
             }
 
+            if(anyListeners()) compareDataAndCallListeners(Map.copyOf(context.rawData), Map.of());
+
             cleanupSectionRecursively(context.rawData);
         }
     }
