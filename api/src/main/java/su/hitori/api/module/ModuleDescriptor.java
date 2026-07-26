@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 
 /**
- * Descriptor of module. Performing all load, enable and reload logic of module. Also stores active instance.
+ * Descriptor of module. Performing all load, enable and reload logic of the module. Also, stores active instance.
  */
 public interface ModuleDescriptor extends Keyed {
 
@@ -30,6 +30,9 @@ public interface ModuleDescriptor extends Keyed {
      */
     File getFolder();
 
+    /**
+     * ClassLoader for the module
+     */
     @Nullable ClassLoader classLoader();
 
 }

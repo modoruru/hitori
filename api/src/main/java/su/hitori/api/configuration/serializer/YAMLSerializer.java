@@ -30,12 +30,12 @@ public final class YAMLSerializer implements Serializer {
     }
 
     @Override
-    public void write(SectionScheme.Node node, Map<String, Object> rawData, OutputStream output) {
+    public void write(SectionScheme.Node rootSchemeNode, Map<String, Object> rawData, OutputStream output) {
         // build map for proper saving
         Map<String, Object> map = new HashMap<>();
 
-        assert node.section() != null;
-        writeSection("", node, rawData, map);
+        assert rootSchemeNode.section() != null;
+        writeSection("", rootSchemeNode, rawData, map);
 
         try (OutputStreamWriter writer = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
             yaml.dump(map, writer);
