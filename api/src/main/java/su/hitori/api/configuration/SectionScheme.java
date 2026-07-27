@@ -1,6 +1,7 @@
 package su.hitori.api.configuration;
 
 import org.jspecify.annotations.Nullable;
+import su.hitori.api.configuration.exception.IllegalSchemeException;
 import su.hitori.api.util.UnsafeUtil;
 
 import java.lang.reflect.Modifier;
@@ -22,7 +23,7 @@ import java.util.Map;
  * <h2>Declaring primitive and list nodes in the section</h2>
  * Every primitive should be declared using {@link Field} object.<br>
  * For primitives {@link Field}'s are created using {@link Field#create(Object)} method.<br>
- * For lists, it's the {@link Field#createList(Object, Class)} method.
+ * For lists, it's the {@link Field#createList(List, Class)} method.
  * <p>
  * An example of declaring fields shown below:
  * <pre>{@code
@@ -50,7 +51,26 @@ public abstract class SectionScheme {
     @Nullable Node root;
 
     public SectionScheme() {
-        // todo: scheme verification
+        Class<? extends SectionScheme> schemeClass = getClass();
+
+        try {
+            schemeClass.getConstructor();
+        }
+        catch (NoSuchMethodException e) {
+            throw new IllegalSchemeException(e, "Section scheme requires public constructor with no arguments.");
+        }
+
+        for (java.lang.reflect.Field internalField : schemeClass.getDeclaredFields()) {
+            int modifiers = internalField.getModifiers();
+            if(Modifier.isStatic(modifiers)) continue;
+
+            Class<?> internalFieldType = internalField.getType();
+            if(!internalFieldType.isAssignableFrom(Field.class) && !SectionScheme.class.isAssignableFrom(internalFieldType)) continue;
+
+            String internalFieldName = internalField.getName();
+            if(!Modifier.isPublic(modifiers)) throw new IllegalSchemeException("Scheme node %s should be public", internalFieldName);
+            if(!Modifier.isFinal(modifiers)) throw new IllegalSchemeException("Scheme node %s should be final", internalFieldName);
+        }
     }
 
     /**

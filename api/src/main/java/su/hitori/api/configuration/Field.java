@@ -8,6 +8,7 @@ import su.hitori.api.configuration.listener.RegisteredFieldListener;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.util.UnsafeUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -72,13 +73,31 @@ public final class Field<T> {
         assert context != null && info != null;
 
         Object rawValue = context.get(info);
-        if(rawValue == null) return defaultValue;
+        if(rawValue == null) {
+            if(List.class == type) {
+                List<?> defaultValues = UnsafeUtil.cast(defaultValue);
+                assert defaultValues != null;
+
+                T returnValue = UnsafeUtil.cast(new ArrayList<>(defaultValues));
+                assert returnValue != null;
+                return returnValue;
+            }
+            return defaultValue;
+        }
 
         if(!type.isInstance(rawValue)) throw InternalException.formatted(
                 "Type mismatch: value present in config is not an instance of %s, it is actually instance of %s",
                 type.getName(),
                 rawValue.getClass().getName()
         );
+
+        // if T is a list, return copy of it
+        if(List.class == type) {
+            List<?> valueAsList = UnsafeUtil.cast(rawValue);
+            assert valueAsList != null;
+
+            rawValue = new ArrayList<>(valueAsList);
+        }
 
         T returnValue = UnsafeUtil.cast(rawValue);
         assert returnValue != null;
@@ -108,7 +127,12 @@ public final class Field<T> {
             return UnsafeUtil.cast(rawCurrentValue);
         }
 
-        context.set(info, value);
+        if(List.class == type) {
+            List<?> cast = UnsafeUtil.cast(value);
+            assert cast != null;
+            context.set(info, List.copyOf(cast));
+        }
+        else context.set(info, value);
         return null;
     }
 
@@ -131,10 +155,7 @@ public final class Field<T> {
                 return new Field<>(clazz, null, defaultValue);
         }
 
-        if(clazz.isArray() || clazz.isAssignableFrom(List.class))
-            return new Field<>(clazz, null, defaultValue);
-
-        throw new IllegalStateException("Field type should be a primitive, or, a java.util.List");
+        throw new IllegalStateException("Field type should be a primitive");
     }
 
     /**
@@ -156,10 +177,20 @@ public final class Field<T> {
      * Creates field for holding list of the primitives, another lists or the {@link SectionScheme}
      * @param defaultValue list with default entries
      * @return created field
-     * @param <T> type of the list
+     * @param <T> type of the list, either primitive or {@link SectionScheme}
      */
-    public static <T> Field<List<T>> createList(T defaultValue, Class<?> listType) {
-        throw new UnsupportedOperationException(); // todo
+    public static <T> Field<List<T>> createList(List<T> defaultValue, Class<T> listElementsType) {
+        Class<List<T>> clazz = UnsafeUtil.cast(defaultValue.getClass());
+        assert clazz != null;
+
+        if(listElementsType == List.class) throw new IllegalArgumentException("Embedded list are not allowed at the time.");
+
+        for (Class<?> primitiveClass : PRIMITIVES_CLASSES) {
+            if(primitiveClass.isAssignableFrom(listElementsType))
+                return new Field<>(clazz, listElementsType, defaultValue);
+        }
+
+        throw new IllegalStateException("List elements type should be a primitive");
     }
 
     private void checkContext() {
