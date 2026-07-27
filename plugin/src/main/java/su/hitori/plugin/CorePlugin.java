@@ -7,6 +7,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.Hitori;
 import su.hitori.api.HitoriHolder;
 import su.hitori.api.HitoriRegistryAccess;
@@ -39,7 +40,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
 
     private final Registry<HitoriConfiguration<?>> configurationRegistry;
 
-    private CommandRegistryModifier commandRegistryModifier;
+    private @Nullable CommandRegistryModifier commandRegistryModifier;
 
     CorePlugin(LoggerFactory loggerFactory, ModuleRepositoryImpl moduleRepository) {
         this.loggerFactory = loggerFactory;
@@ -61,6 +62,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
                 new CoreConfiguration(),
                 ConfigurationSource.file(YAMLSerializer.INSTANCE, getDataPath().resolve("config/config.yml"))
         );
+
         configurationRegistry.register(coreConfiguration.key(), coreConfiguration);
 
         ServicesManager servicesManager = Bukkit.getServicesManager();
@@ -122,6 +124,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
     }
 
     public CommandRegistryModifier commandRegistryModifier() {
+        assert commandRegistryModifier != null;
         return commandRegistryModifier;
     }
 

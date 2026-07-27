@@ -49,12 +49,19 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
         rootSectionScheme.root = SectionScheme.compileSectionNode(context, "", rootSectionScheme.getClass(), rootSectionScheme);
 
-        if(configurationSource != null) readFromSource();
+        if(configurationSource != null) readFromSource(configurationSource, true);
     }
 
     @Override
     public Key key() {
         return key;
+    }
+
+    /**
+     * @return if configuration has been read at least once
+     */
+    public boolean loaded() {
+        return context.rawData != null;
     }
 
     /**
@@ -82,23 +89,33 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
     }
 
     /**
-     * Reads configuration from the {@link ConfigurationSource}
+     * Reads configuration from the {@link ConfigurationSource} using {@link HitoriConfiguration#readFromSource(ConfigurationSource, boolean)} with createIfAbsent set to false.
      * @throws IllegalStateException if {@link HitoriConfiguration#hasConfigurationSource()} is false
      */
     public void readFromSource() {
         if(configurationSource == null) throw new IllegalStateException("This HitoriConfiguration doesn't have a default configurationSource.");
-        readFromSource(configurationSource);
+        readFromSource(configurationSource, false);
     }
 
     /**
      * Reads configuration from the {@link ConfigurationSource}
+     * If configuration source is a file, and
      * @param configurationSource configuration source to read from
      */
-    public void readFromSource(ConfigurationSource configurationSource) {
+    public void readFromSource(ConfigurationSource configurationSource, boolean createIfAbsent) {
         synchronized (context.lock) {
             try {
                 InputStream inputStream;
-                if(configurationSource.file != null) inputStream = new FileInputStream(configurationSource.file);
+                if(configurationSource.file != null) {
+                    if(!configurationSource.file.exists()) {
+                        defaults();
+
+                        if(createIfAbsent) writeToSource();
+                        return;
+                    }
+
+                    inputStream = new FileInputStream(configurationSource.file);
+                }
                 else {
                     assert configurationSource.inputStreamCreator != null;
                     inputStream = configurationSource.inputStreamCreator.get();
@@ -131,7 +148,12 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
         synchronized (context.lock) {
             try {
                 OutputStream outputStream;
-                if(configurationSource.file != null) outputStream = new FileOutputStream(configurationSource.file);
+                if(configurationSource.file != null) {
+                    File file = configurationSource.file;
+                    if(!file.getParentFile().exists()) file.getParentFile().mkdirs();
+
+                    outputStream = new FileOutputStream(file);
+                }
                 else {
                     assert configurationSource.outputStreamCreator != null;
                     outputStream = configurationSource.outputStreamCreator.get();
@@ -149,6 +171,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
     /**
      * Writes defaults to the all fields of the instance.
+     * Counts as {@link HitoriConfiguration#read(Serializer, InputStream)} method (so {@link HitoriConfiguration#loaded()} will return true).
      */
     public void defaults() {
         synchronized (context.lock) {
@@ -350,7 +373,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
      * Create an instance of the configuration
      * @param key key of the configuration (used in registration, especially in the {@link ConfigurationsRegistrar}
      * @param rootSectionScheme scheme of the configuration
-     * @param configurationSource configuration source. if not null, {@link HitoriConfiguration#readFromSource()} would be called immediately after the creation
+     * @param configurationSource configuration source. if not null, {@link HitoriConfiguration#readFromSource(ConfigurationSource, boolean)} with createIfAbsent set to true would be called immediately after the creation
      * @return created configuration instance
      * @param <C> type of the scheme
      */

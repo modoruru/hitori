@@ -4,6 +4,7 @@ import com.mojang.brigadier.LiteralMessage;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.ServerBuildInfo;
@@ -11,10 +12,15 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import net.kyori.adventure.key.Key;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.Pair;
+import su.hitori.api.configuration.Field;
 import su.hitori.api.configuration.HitoriConfiguration;
+import su.hitori.api.configuration.SectionScheme;
 import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.Module;
 import su.hitori.api.module.ModuleDescriptor;
@@ -58,19 +64,147 @@ final class HitoriCommand {
                                 .then(Commands.literal("field")
                                         .then(Commands.argument("path", StringArgumentType.string())
                                                 .suggests((context, builder) -> {
-                                                    Key key = context.getArgument("key", NamespacedKey.class);
+                                                    HitoriConfiguration<?> configuration = extractConfiguration(corePlugin, context, false);
+                                                    assert configuration != null;
 
-                                                    HitoriConfiguration<?> configuration = corePlugin.configurationRegistry().get(key);
-                                                    if(configuration == null) throw new SimpleCommandExceptionType(new LiteralMessage("Can't find \"" + key.asString() + "\" configuration.")).create();
+                                                    Map<String, SectionScheme.Node> lastSection = configuration.rootNode().section();
+                                                    assert lastSection != null;
 
+                                                    String currentValue = builder.getRemaining();
+                                                    if(currentValue.isEmpty()) {
+                                                        lastSection.keySet().forEach(builder::suggest);
+                                                        return builder.buildFuture();
+                                                    }
+                                                    boolean endsWithDot = currentValue.charAt(currentValue.length() - 1) == '.';
 
-                                                })))
-                                .then(Commands.literal("read").executes())))
+                                                    String[] pathParts = builder.getRemaining().split("\\.");
+
+                                                    int readPathPartsLength = 0;
+                                                    Map<String, SectionScheme.Node> lastFoundSection = lastSection;
+                                                    int sectionsToSeek = pathParts.length;
+                                                    if(!endsWithDot) --sectionsToSeek;
+
+                                                    for (int i = 0; i < sectionsToSeek; i++) {
+                                                        String pathPart = pathParts[i];
+                                                        readPathPartsLength += pathPart.length();
+                                                        if(i != 0) ++readPathPartsLength;
+                                                        SectionScheme.Node node = lastFoundSection.get(pathPart);
+                                                        if(node == null || node.nodeType() != SectionScheme.NodeType.SECTION) {
+                                                            throw new SimpleCommandExceptionType(new LiteralMessage(String.format(
+                                                                    "Node %s on %s config either doesn't exists or is not a section",
+                                                                    currentValue.substring(0, readPathPartsLength),
+                                                                    configuration.key().asString()
+                                                            ))).create();
+                                                        }
+
+                                                        lastFoundSection = node.section();
+                                                        assert lastFoundSection != null;
+                                                    }
+
+                                                    String lastPart = pathParts[pathParts.length - 1];
+                                                    for (String nodeKey : lastFoundSection.keySet()) {
+                                                        if(endsWithDot || nodeKey.startsWith(lastPart)) {
+                                                            if(pathParts.length == 1 && !endsWithDot) builder.suggest(nodeKey); // petrusha
+                                                            else builder.suggest(currentValue.substring(0, readPathPartsLength) + '.' + nodeKey);
+                                                        }
+                                                    }
+
+                                                    return builder.buildFuture();
+                                                })
+                                                .then(Commands.literal("get")
+                                                        .executes(context -> getConfigValue(corePlugin, context)))))
+                                .then(Commands.literal("read")
+                                        .executes(context -> readConfigFromSource(corePlugin, context)))))
                 .build();
     }
 
-    private static int readConfigFromSource(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) {
+    private static @Nullable HitoriConfiguration<?> extractConfiguration(CorePlugin corePlugin, CommandContext<CommandSourceStack> context, boolean messageInsteadOfException) throws CommandSyntaxException {
+        Key key = context.getArgument("key", NamespacedKey.class);
 
+        HitoriConfiguration<?> configuration = corePlugin.configurationRegistry().get(key);
+        if(configuration == null) {
+            if(messageInsteadOfException) {
+                Messages.ERROR.createAndSendToSender(context.getSource(), "Can't find \"" + key.asString() + "\" configuration.");
+                return null;
+            }
+
+            throw new SimpleCommandExceptionType(new LiteralMessage("Can't find \"" + key.asString() + "\" configuration.")).create();
+        }
+
+        return configuration;
+    }
+
+    private static int getConfigValue(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        HitoriConfiguration<?> configuration = extractConfiguration(corePlugin, context, true);
+        if(configuration == null) return 0;
+
+        String path = context.getArgument("path", String.class);
+        String[] pathParts = path.split("\\.");
+
+        Map<String, SectionScheme.Node> section = configuration.rootNode().section();
+        assert section != null;
+
+        int readPathPartsLength = 0;
+        for(int i = 0, length = pathParts.length - 1; i < length; i++) {
+            String pathPart = pathParts[i];
+            readPathPartsLength += pathPart.length();
+            if(i != 0) ++readPathPartsLength;
+
+            SectionScheme.Node node = section.get(pathPart);
+            if(node == null || node.nodeType() != SectionScheme.NodeType.SECTION) {
+                Messages.ERROR.createAndSendToSender(context.getSource(), String.format(
+                        "Node <aqua>%s</aqua> on <yellow>%s</yellow> config either doesn't exists or is not a section.",
+                        path.substring(0, readPathPartsLength),
+                        configuration.key().asString()
+                ));
+                return 0;
+            }
+
+            section = node.section();
+            assert section != null;
+        }
+
+        SectionScheme.Node node = section.get(pathParts[pathParts.length - 1]);
+        switch (node.nodeType()) {
+            case PRIMITIVE -> {
+                Field<?> field = node.field();
+                assert field != null;
+
+                context.getSource().getSender().sendMessage(
+                        Messages.INFO.create(String.format(
+                                "<aqua>%s</aqua> node value on config <yellow>%s</yellow> is: ",
+                                path,
+                                configuration.key().asString()
+                        )).append(Component.text(
+                                field.type() == String.class
+                                        ? '"' + (String) field.get() + '"'
+                                        : String.valueOf(field.get())
+                        ).color(NamedTextColor.AQUA))
+                );
+            }
+            case LIST -> throw new UnsupportedOperationException();
+            case SECTION -> Messages.ERROR.createAndSendToSender(context.getSource(), String.format(
+                    "Node <aqua>%s</aqua> is a section: only reading specific values is supported.",
+                    pathParts[pathParts.length - 1]
+            ));
+        }
+
+        return 1;
+    }
+
+    private static int readConfigFromSource(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        HitoriConfiguration<?> configuration = extractConfiguration(corePlugin, context, true);
+        if(configuration == null) return 0;
+
+        if(!configuration.hasConfigurationSource()) {
+            Messages.ERROR.createAndSendToSender(context.getSource(), "Configuration <yellow>" + configuration.key().asString() + "</yellow> has no default source.");
+            return 0;
+        }
+
+        configuration.readFromSource();
+        Messages.INFO.createAndSendToSender(context.getSource(), "Configuration <yellow>" + configuration.key().asString() + "</yellow> was read from it's default source.");
+
+        return 1;
     }
 
     private static String formatBytes(long bytes) {
@@ -189,7 +323,7 @@ final class HitoriCommand {
         ModuleDescriptor descriptor = corePlugin.moduleRepository().getModule(key).orElse(null);
         if(descriptor == null) {
             sender.sendMessage(Messages.ERROR.text("Module does not exists."));
-            return 1;
+            return 0;
         }
 
         ModuleDescriptorImpl impl = (ModuleDescriptorImpl) descriptor;
@@ -211,6 +345,7 @@ final class HitoriCommand {
                 return 1;
             }
         }
+        assert impl.getJar() != null;
         impl.reload(impl.getJar(), true, true, Set.of());
         sender.sendMessage(Messages.INFO.create("Module successfully reloaded."));
 
