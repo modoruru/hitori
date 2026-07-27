@@ -112,6 +112,10 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
         return serverCoreInfo;
     }
 
+    public Registry<HitoriConfiguration<?>> configurationRegistry() {
+        return configurationRegistry;
+    }
+
     @Override
     public HitoriRegistryAccess registryAccess() {
         return this;

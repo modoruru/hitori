@@ -52,18 +52,18 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
         if(configurationSource != null) readFromSource();
     }
 
-    /**
-     * Modules can register {@link FieldListener}s by invoking {@link Field#listen(ModuleDescriptor, FieldListener)}.
-     * Field invokes {@link HitoriConfiguration}'s internal class {@link Context} which is actually stores all the registered listeners.<br>
-     * This method iterates over all registered listeners and removes any registered by the passed {@link ModuleDescriptor}.
-     * @throws IllegalStateException if the configuration has not been loaded at least once
-     */
-    public void unregisterAllFieldListeners(ModuleDescriptor descriptor) {
-        if(context.rawData == null) throw notLoaded();
+    @Override
+    public Key key() {
+        return key;
+    }
 
-        for (Map<Key, RegisteredFieldListener> map : context.fieldListeners.values()) {
-            map.keySet().removeIf(key -> key.equals(descriptor.key()));
-        }
+    /**
+     * @return configuration scheme that is available for reading and writing fields
+     * @throws IllegalStateException if configuration hasn't been read at least once
+     */
+    public RootScheme access() {
+        if(context.rawData == null) throw notLoaded();
+        return rootSectionScheme;
     }
 
     /**
@@ -172,6 +172,36 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
     }
 
     /**
+     * Writes configuration to the {@link OutputStream}
+     * @param serializer serializer to use
+     * @param output output stream to write to
+     * @throws IllegalStateException if configuration hasn't been read at least once
+     */
+    public void write(Serializer serializer, OutputStream output) {
+        if(context.rawData == null) throw notLoaded();
+
+        synchronized (context.lock) {
+            serializer.write(rootSectionScheme.root, context.rawData, output);
+        }
+    }
+
+    /**
+     * Writes configuration to the {@link OutputStream} asynchronously.
+     * @param serializer serializer to use
+     * @param output output stream to write to
+     * @param executor executor to run write task
+     * @throws IllegalStateException if configuration hasn't been read at least once
+     */
+    public void writeAsync(Serializer serializer, OutputStream output, Executor executor) {
+        if(context.rawData == null) throw notLoaded();
+
+        synchronized (context.lock) {
+            Map<String, Object> copy = new HashMap<>(context.rawData);
+            executor.execute(() -> serializer.write(rootSectionScheme.root, copy, output));
+        }
+    }
+
+    /**
      * Reads configuration using {@link YAMLSerializer} serializer
      * @param input input stream to read from
      */
@@ -213,6 +243,20 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
             // last blocking and huge operation
             if(anyListeners) compareDataAndCallListeners(originalData, Map.copyOf(context.rawData));
+        }
+    }
+
+    /**
+     * Modules can register {@link FieldListener}s by invoking {@link Field#listen(ModuleDescriptor, FieldListener)}.
+     * Field invokes {@link HitoriConfiguration}'s internal class {@link Context} which is actually stores all the registered listeners.<br>
+     * This method iterates over all registered listeners and removes any registered by the passed {@link ModuleDescriptor}.
+     * @throws IllegalStateException if the configuration has not been loaded at least once
+     */
+    public void unregisterAllFieldListeners(ModuleDescriptor descriptor) {
+        if(context.rawData == null) throw notLoaded();
+
+        for (Map<Key, RegisteredFieldListener> map : context.fieldListeners.values()) {
+            map.keySet().removeIf(key -> key.equals(descriptor.key()));
         }
     }
 
@@ -264,18 +308,20 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
     }
 
     private void compareFieldValuesAndCallListeners(String fieldAbsolutePath, @Nullable Object oldValue, @Nullable Object newValue, Collection<RegisteredFieldListener> listeners) {
+        if(listeners.isEmpty()) return;
+
         if(oldValue == null && newValue == null) return;
         if(oldValue != null && newValue != null && (oldValue == newValue || oldValue.equals(newValue))) return;
 
         Field<?> field = resolveField(fieldAbsolutePath);
         if(field == null) throw InternalException.formatted("Can't find %s field", fieldAbsolutePath);
 
-        for (RegisteredFieldListener listener : listeners) {
-            if(!listener.registrar().isEnabled()) continue;
+        listeners.removeIf(registeredFieldListener -> {
+            if(registeredFieldListener.registrar().isEnabled()) return true;
 
             executor.execute(() -> {
                 try {
-                    listener.listener().handle(
+                    registeredFieldListener.listener().handle(
                             UnsafeUtil.cast(oldValue == null ? field.defaultValue : oldValue),
                             UnsafeUtil.cast(newValue == null ? field.defaultValue : newValue),
                             ChangeCause.CONFIG_READ
@@ -286,56 +332,14 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
                             "Handler for the %s/%s field from the %s module has failed:\n%s",
                             key.asString(),
                             fieldAbsolutePath,
-                            listener.registrar().key().asString(),
+                            registeredFieldListener.registrar().key().asString(),
                             LoggerUtil.exceptionToString(throwable)
                     ));
                 }
             });
-        }
-    }
 
-    /**
-     * Writes configuration to the {@link OutputStream}
-     * @param serializer serializer to use
-     * @param output output stream to write to
-     * @throws IllegalStateException if configuration hasn't been read at least once
-     */
-    public void write(Serializer serializer, OutputStream output) {
-        if(context.rawData == null) throw notLoaded();
-
-        synchronized (context.lock) {
-            serializer.write(rootSectionScheme.root, context.rawData, output);
-        }
-    }
-
-    /**
-     * Writes configuration to the {@link OutputStream} asynchronously.
-     * @param serializer serializer to use
-     * @param output output stream to write to
-     * @param executor executor to run write task
-     * @throws IllegalStateException if configuration hasn't been read at least once
-     */
-    public void writeAsync(Serializer serializer, OutputStream output, Executor executor) {
-        if(context.rawData == null) throw notLoaded();
-
-        synchronized (context.lock) {
-            Map<String, Object> copy = new HashMap<>(context.rawData);
-            executor.execute(() -> serializer.write(rootSectionScheme.root, copy, output));
-        }
-    }
-
-    /**
-     * @return configuration scheme that is available for reading and writing fields
-     * @throws IllegalStateException if configuration hasn't been read at least once
-     */
-    public RootScheme access() {
-        if(context.rawData == null) throw notLoaded();
-        return rootSectionScheme;
-    }
-
-    @Override
-    public Key key() {
-        return key;
+            return false;
+        });
     }
 
     private static IllegalStateException notLoaded() {

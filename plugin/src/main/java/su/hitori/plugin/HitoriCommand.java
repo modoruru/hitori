@@ -1,7 +1,10 @@
 package su.hitori.plugin;
 
+import com.mojang.brigadier.LiteralMessage;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.ServerBuildInfo;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -11,6 +14,7 @@ import net.kyori.adventure.key.Key;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.CommandSender;
 import su.hitori.api.Pair;
+import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.Module;
 import su.hitori.api.module.ModuleDescriptor;
@@ -43,7 +47,30 @@ final class HitoriCommand {
                                 .executes(context -> reload(corePlugin, context))))
                 .then(Commands.literal("dump")
                         .executes(context -> dump(corePlugin, context)))
+                .then(Commands.literal("config")
+                        .then(Commands.argument("key", ArgumentTypes.namespacedKey())
+                                .suggests((_, builder) -> {
+                                    for (Key key : corePlugin.configurationRegistry().keys()) {
+                                        builder.suggest(key.asString());
+                                    }
+                                    return builder.buildFuture();
+                                })
+                                .then(Commands.literal("field")
+                                        .then(Commands.argument("path", StringArgumentType.string())
+                                                .suggests((context, builder) -> {
+                                                    Key key = context.getArgument("key", NamespacedKey.class);
+
+                                                    HitoriConfiguration<?> configuration = corePlugin.configurationRegistry().get(key);
+                                                    if(configuration == null) throw new SimpleCommandExceptionType(new LiteralMessage("Can't find \"" + key.asString() + "\" configuration.")).create();
+
+
+                                                })))
+                                .then(Commands.literal("read").executes())))
                 .build();
+    }
+
+    private static int readConfigFromSource(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) {
+
     }
 
     private static String formatBytes(long bytes) {

@@ -190,6 +190,10 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                     true
             );
 
+            for (Map.Entry<Key, HitoriConfiguration<?>> entry : configurationsRegistrar.configurations.entrySet()) {
+                configurationsRegistrar.registry.register(entry.getKey(), entry.getValue());
+            }
+
             enabling = false;
             enabled = true;
 
@@ -372,6 +376,12 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             for (Key key : configurationsRegistrar.configurations.keySet()) {
                 ((MappedRegistry<HitoriConfiguration<?>>) configurationsRegistrar.registry).remove(key);
             }
+
+            for (HitoriConfiguration<?> configuration : configurationsRegistrar.registry.elements()) {
+                configuration.unregisterAllFieldListeners(this);
+            }
+
+            configurationsRegistrar.configurations.clear();
         }
         configurationsRegistrar = new ConfigurationsRegistrarImpl(corePlugin.access(HitoriRegistryAccess.CONFIGURATION).orElseThrow());
         compatibilityLayer = new CompatibilityLayerImpl();
