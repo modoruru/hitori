@@ -23,6 +23,7 @@ import su.hitori.api.registry.RegistryKey;
 import su.hitori.api.util.Messages;
 import su.hitori.api.util.UnsafeUtil;
 import su.hitori.plugin.command.CommandRegistryModifier;
+import su.hitori.plugin.command.FoliaCommandsRegistryModifier;
 import su.hitori.plugin.command.PaperCommandRegistryModifier;
 import su.hitori.plugin.container.ContainerListener;
 import su.hitori.plugin.module.ModuleRepositoryImpl;
@@ -54,7 +55,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
 
     @Override
     public void onEnable() {
-        if(serverCoreInfo.isFolia()) throw new UnsupportedOperationException("penis");
+        if(serverCoreInfo.isFolia()) commandRegistryModifier = new FoliaCommandsRegistryModifier(this);
         else commandRegistryModifier = new PaperCommandRegistryModifier(this);
 
         HitoriConfiguration<CoreConfiguration> coreConfiguration = HitoriConfiguration.create(

@@ -7,10 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.configuration.serializer.YAMLSerializer;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Path;
 
 public final class ConfigTest {

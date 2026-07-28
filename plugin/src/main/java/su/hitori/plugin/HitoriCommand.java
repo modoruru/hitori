@@ -54,8 +54,8 @@ final class HitoriCommand {
                 .then(Commands.literal("reload")
                         .then(moduleArgument(corePlugin)
                                 .then(Commands.argument("sure", BoolArgumentType.bool())
-                                        .executes(context -> reload(corePlugin, context)))
-                                .executes(context -> reload(corePlugin, context))))
+                                        .executes(context -> reload(corePlugin, context, context.getArgument("sure", Boolean.class))))
+                                .executes(context -> reload(corePlugin, context, false))))
                 .then(Commands.literal("dump")
                         .executes(context -> dump(corePlugin, context)))
                 .then(Commands.literal("config")
@@ -431,10 +431,9 @@ final class HitoriCommand {
         return 1;
     }
 
-    private static int reload(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) {
+    private static int reload(CorePlugin corePlugin, CommandContext<CommandSourceStack> context, boolean sure) {
         CommandSender sender = context.getSource().getSender();
 
-        boolean areUserSure = context.getArgument("sure", Boolean.class);
         NamespacedKey key = context.getArgument("module", NamespacedKey.class);
         ModuleDescriptor descriptor = corePlugin.moduleRepository().getModule(key).orElse(null);
         if(descriptor == null) {
@@ -444,7 +443,7 @@ final class HitoriCommand {
 
         ModuleDescriptorImpl impl = (ModuleDescriptorImpl) descriptor;
 
-        if(!areUserSure) {
+        if(!sure) {
             Optional<List<Key>> affectedModules = impl.getReloadAffectedModules();
             if(affectedModules.isPresent()) {
                 sender.sendMessage(Messages.WARNING.create(String.format(
