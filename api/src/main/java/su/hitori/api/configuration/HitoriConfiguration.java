@@ -101,6 +101,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
      * Reads configuration from the {@link ConfigurationSource}
      * If configuration source is a file, and
      * @param configurationSource configuration source to read from
+     * @param createIfAbsent if configuration source backs to the file and the file doesn't exist it'll create fresh file with defaults written.
      */
     public void readFromSource(ConfigurationSource configurationSource, boolean createIfAbsent) {
         synchronized (context.lock) {

@@ -52,6 +52,10 @@ public final class Field<T> {
         return type;
     }
 
+    public @Nullable Class<?> listType() {
+        return listType;
+    }
+
     /**
      * @return default value of the field
      */
@@ -116,7 +120,7 @@ public final class Field<T> {
         Object rawCurrentValue = context.get(info);
         if(rawCurrentValue == null && value == null) return null;
 
-        if(rawCurrentValue != null) {
+        if(rawCurrentValue != null && value == null) {
             if(!type.isInstance(rawCurrentValue)) throw InternalException.formatted(
                     "Type mismatch: value present in config is not an instance of %s, it is actually instance of %s",
                     type.getName(),
@@ -184,6 +188,7 @@ public final class Field<T> {
         assert clazz != null;
 
         if(listElementsType == List.class) throw new IllegalArgumentException("Embedded list are not allowed at the time.");
+        if(SectionScheme.class.isAssignableFrom(listElementsType)) throw new UnsupportedOperationException("Creating lists of sections is not supported yet, sorry for the inconvenience.");
 
         for (Class<?> primitiveClass : PRIMITIVES_CLASSES) {
             if(primitiveClass.isAssignableFrom(listElementsType))

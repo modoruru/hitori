@@ -34,7 +34,7 @@ public final class ConfigurationSource {
     /**
      * Creates ConfigurationSource based on the {@link InputStream} for reading and {@link OutputStream} for writing.
      * @param serializer serializer for the serialization/deserialization
-     * @param inputStreamCreator creator of the {@link InputStream}, called on {@link HitoriConfiguration#readFromSource(ConfigurationSource)} call
+     * @param inputStreamCreator creator of the {@link InputStream}, called on {@link HitoriConfiguration#readFromSource(ConfigurationSource, boolean)} call
      * @param outputStreamCreator creator of the {@link OutputStream}, called on {@link HitoriConfiguration#writeToSource(ConfigurationSource)} call
      * @return created ConfigurationSource
      */

@@ -5,6 +5,7 @@ import org.yaml.snakeyaml.Yaml;
 import su.hitori.api.configuration.Field;
 import su.hitori.api.configuration.SectionScheme;
 import su.hitori.api.util.NameFormatter;
+import su.hitori.api.util.SafeUtil;
 import su.hitori.api.util.UnsafeUtil;
 
 import java.io.IOException;
@@ -12,7 +13,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -69,16 +72,33 @@ public final class YAMLSerializer implements Serializer {
 
                     Object rawValue = rawData.get(pathPrefix + nodeName);
                     if(rawValue != null) {
-                        if(field.type().isEnum())
-                            //noinspection DataFlowIssue
-                            yield Enum.valueOf(UnsafeUtil.cast(field.type()), rawValue.toString());
+                        if(rawValue instanceof Enum<?> asEnum) yield asEnum.name();
 
                         yield rawValue;
                     }
 
                     yield field.defaultValue();
                 }
-                case LIST -> throw new UnsupportedOperationException(); // todo
+                case LIST -> {
+                    Field<?> field = embeddedNode.field();
+                    assert field != null;
+
+                    Object rawValue = rawData.get(pathPrefix + nodeName);
+
+                    List<Object> resultList = new ArrayList<>();
+                    List<Object> rawList = UnsafeUtil.cast(rawValue == null ? field.defaultValue() : rawValue);
+                    assert rawList != null;
+
+                    for (Object object : rawList) {
+                        resultList.add(switch (object) {
+                            case SectionScheme _ -> throw new UnsupportedOperationException("Serializing lists of sections is not supported yet, sorry for the inconvenience.");
+                            case Enum<?> asEnum -> asEnum.name();
+                            default -> object;
+                        });
+                    }
+
+                    yield resultList;
+                }
             };
 
             results.put(yamlName, resultValue);
@@ -140,7 +160,25 @@ public final class YAMLSerializer implements Serializer {
 
                     results.put(pathPrefix + convertedName, value);
                 }
-                case LIST -> throw new UnsupportedOperationException(); // todo
+                case LIST -> {
+                    Field<?> field = correspondingNode.field();
+                    assert field != null;
+
+                    List<Object> rawList = UnsafeUtil.cast(value);
+                    assert rawList != null;
+
+                    List<Object> list = new ArrayList<>();
+
+                    assert field.listType() != null;
+                    if(field.listType().isEnum()) for (Object object : rawList) {
+                        //noinspection DataFlowIssue
+                        list.add(SafeUtil.enumValueOf(UnsafeUtil.cast(field.listType()), UnsafeUtil.cast(object)));
+                    }
+                    else if(SectionScheme.class.isAssignableFrom(field.listType())) throw new UnsupportedOperationException("Deserializing lists of sections is not supported yet, sorry for the inconvenience.");
+                    else list.addAll(rawList);
+
+                    results.put(pathPrefix + convertedName, list);
+                }
             }
         }
     }

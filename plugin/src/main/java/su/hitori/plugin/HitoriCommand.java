@@ -1,6 +1,7 @@
 package su.hitori.plugin;
 
 import com.mojang.brigadier.LiteralMessage;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -28,6 +29,8 @@ import su.hitori.api.module.ModuleMeta;
 import su.hitori.api.module.ModuleRepository;
 import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Messages;
+import su.hitori.api.util.SafeUtil;
+import su.hitori.api.util.UnsafeUtil;
 import su.hitori.plugin.module.ModuleDescriptorImpl;
 
 import java.io.IOException;
@@ -50,6 +53,8 @@ final class HitoriCommand {
                         .executes(context -> modules(corePlugin, context)))
                 .then(Commands.literal("reload")
                         .then(moduleArgument(corePlugin)
+                                .then(Commands.argument("sure", BoolArgumentType.bool())
+                                        .executes(context -> reload(corePlugin, context)))
                                 .executes(context -> reload(corePlugin, context))))
                 .then(Commands.literal("dump")
                         .executes(context -> dump(corePlugin, context)))
@@ -112,9 +117,14 @@ final class HitoriCommand {
                                                     return builder.buildFuture();
                                                 })
                                                 .then(Commands.literal("get")
-                                                        .executes(context -> getConfigValue(corePlugin, context)))))
+                                                        .executes(context -> getConfigValue(corePlugin, context)))
+                                                .then(Commands.literal("set")
+                                                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                                                .executes(context -> setConfigValue(corePlugin, context))))))
                                 .then(Commands.literal("read")
-                                        .executes(context -> readConfigFromSource(corePlugin, context)))))
+                                        .executes(context -> readConfigFromSource(corePlugin, context)))
+                                .then(Commands.literal("write")
+                                        .executes(context -> writeConfigToSource(corePlugin, context)))))
                 .build();
     }
 
@@ -134,10 +144,7 @@ final class HitoriCommand {
         return configuration;
     }
 
-    private static int getConfigValue(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        HitoriConfiguration<?> configuration = extractConfiguration(corePlugin, context, true);
-        if(configuration == null) return 0;
-
+    private static SectionScheme.@Nullable Node extractNode(CommandContext<CommandSourceStack> context, HitoriConfiguration<?> configuration){
         String path = context.getArgument("path", String.class);
         String[] pathParts = path.split("\\.");
 
@@ -157,38 +164,147 @@ final class HitoriCommand {
                         path.substring(0, readPathPartsLength),
                         configuration.key().asString()
                 ));
-                return 0;
+                return null;
             }
 
             section = node.section();
             assert section != null;
         }
 
-        SectionScheme.Node node = section.get(pathParts[pathParts.length - 1]);
+        return section.get(pathParts[pathParts.length - 1]);
+    }
+
+    private static int setConfigValue(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        HitoriConfiguration<?> configuration = extractConfiguration(corePlugin, context, true);
+        if(configuration == null) return 0;
+
+        SectionScheme.Node node = extractNode(context, configuration);
+        if(node == null) return 0;
+
+        String path = context.getArgument("path", String.class);
+        switch (node.nodeType()) {
+            case SECTION -> Messages.ERROR.createAndSendToSender(context.getSource(), String.format(
+                    "Node <aqua>%s</aqua> is a section: only reading specific values is supported.",
+                    path.substring(path.lastIndexOf('.') + 1) // even if there's only one node, lastIndexOf returns -1 and +1 will move index to 0
+            ));
+            case LIST -> throw new UnsupportedOperationException();
+            case PRIMITIVE -> {
+                Field<?> field = node.field();
+                assert field != null;
+
+                String userPassedValue = context.getArgument("value", String.class);
+                Object castValue = switch (field.defaultValue()) {
+                    case Byte _ -> SafeUtil.parseByte(userPassedValue);
+                    case Short _ -> SafeUtil.parseShort(userPassedValue);
+                    case Integer _ -> SafeUtil.parseInt(userPassedValue);
+                    case Long _ -> SafeUtil.parseLong(userPassedValue);
+                    case Float _ -> SafeUtil.parseFloat(userPassedValue);
+                    case Double _ -> SafeUtil.parseDouble(userPassedValue);
+                    case Boolean _ -> SafeUtil.parseBoolean(userPassedValue);
+                    case Character _ -> userPassedValue.charAt(0);
+                    case String _ -> userPassedValue;
+                    case Enum<?> asEnum -> SafeUtil.enumValueOf(asEnum.getClass(), userPassedValue);
+                    default -> throw new UnsupportedOperationException();
+                };
+
+                if(castValue == null) {
+                    Messages.ERROR.createAndSendToSender(context.getSource(), String.format(
+                            "Unable to set new value to <aqua>%s</aqua> node on config <yellow>%s</yellow>: %s",
+                            path,
+                            configuration.key().asString(),
+                            switch (field.defaultValue()) {
+                                case Enum<?> asEnum -> {
+                                    Enum<?>[] constants = asEnum.getClass().getEnumConstants();
+
+                                    StringBuilder builder = new StringBuilder("node only accepts ");
+
+                                    for (int i = 0, length = constants.length; i < length; i++) {
+                                        Enum<?> constant = constants[i];
+                                        builder.append("<aqua>").append(constant.name()).append("</aqua>");
+
+                                        if(i == length - 2) builder.append(" and ");
+                                        else if(i < length - 2) builder.append(", ");
+                                    }
+
+                                    builder.append(" fields");
+                                    yield builder.toString();
+                                }
+                                case Boolean _ -> "node only accepts <aqua>true</aqua> and <aqua>false</aqua> values.";
+                                case Float _, Double _ -> "node only accepts floating point numbers";
+                                case Integer _, Long _ -> "node only accepts integer numbers";
+                                case Byte _ -> String.format("node only accepts integer numbers between %s and %s", Byte.MIN_VALUE, Byte.MAX_VALUE);
+                                case Short _ -> String.format("node only accepts integer numbers between %s and %s", Short.MIN_VALUE, Short.MAX_VALUE);
+                                default -> throw new UnsupportedOperationException();
+                            }
+                    ));
+                    return 0;
+                }
+
+                field.set(UnsafeUtil.cast(castValue));
+                context.getSource().getSender().sendMessage(
+                        Messages.INFO.create(String.format(
+                                "<aqua>%s</aqua> node value on config <yellow>%s</yellow> set to: ",
+                                path,
+                                configuration.key().asString()
+                        )).append(Component.text(displayFieldValueBeauty(castValue)).color(NamedTextColor.AQUA))
+                );
+            }
+        }
+
+        return 1;
+    }
+
+    private static String displayFieldValueBeauty(Object value) {
+        return switch (value) {
+            case String asString -> '"' + asString + '"';
+            case Enum<?> asEnum -> asEnum.name();
+            default -> String.valueOf(value);
+        };
+    }
+
+    private static int getConfigValue(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        HitoriConfiguration<?> configuration = extractConfiguration(corePlugin, context, true);
+        if(configuration == null) return 0;
+
+        SectionScheme.Node node = extractNode(context, configuration);
+        if(node == null) return 0;
+
+        String path = context.getArgument("path", String.class);
         switch (node.nodeType()) {
             case PRIMITIVE -> {
                 Field<?> field = node.field();
                 assert field != null;
 
+                Object value = field.get();
                 context.getSource().getSender().sendMessage(
                         Messages.INFO.create(String.format(
                                 "<aqua>%s</aqua> node value on config <yellow>%s</yellow> is: ",
                                 path,
                                 configuration.key().asString()
-                        )).append(Component.text(
-                                field.type() == String.class
-                                        ? '"' + (String) field.get() + '"'
-                                        : String.valueOf(field.get())
-                        ).color(NamedTextColor.AQUA))
+                        )).append(Component.text(displayFieldValueBeauty(value)).color(NamedTextColor.AQUA))
                 );
             }
             case LIST -> throw new UnsupportedOperationException();
             case SECTION -> Messages.ERROR.createAndSendToSender(context.getSource(), String.format(
                     "Node <aqua>%s</aqua> is a section: only reading specific values is supported.",
-                    pathParts[pathParts.length - 1]
+                    path.substring(path.lastIndexOf('.') + 1) // even if there's only node, lastIndexOf returns -1 and +1 will move index to 0
             ));
         }
 
+        return 1;
+    }
+
+    private static int writeConfigToSource(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        HitoriConfiguration<?> configuration = extractConfiguration(corePlugin, context, true);
+        if(configuration == null) return 0;
+
+        if(!configuration.hasConfigurationSource()) {
+            Messages.ERROR.createAndSendToSender(context.getSource(), "Configuration <yellow>" + configuration.key().asString() + "</yellow> has no default source.");
+            return 0;
+        }
+
+        configuration.writeToSource();
+        Messages.INFO.createAndSendToSender(context.getSource(), "Configuration <yellow>" + configuration.key().asString() + "</yellow> was written to it's default source.");
         return 1;
     }
 
