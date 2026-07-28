@@ -28,7 +28,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
     private final Pipeline<ModuleDescriptorImpl> descriptors = new Pipeline<>();
 
     public void corePlugin(CorePlugin corePlugin) {
-        if(this.corePlugin == null && corePlugin != null) {
+        if(this.corePlugin == null) {
             this.corePlugin = corePlugin;
         }
     }
@@ -49,7 +49,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
 
     void callEnableHooks(Key enabled) {
         for (ModuleDescriptorImpl descriptor : descriptors) {
-            assert descriptor != null && descriptor.getCompatibilityLayer() != null;
+            assert descriptor.getCompatibilityLayer() != null;
             if(!descriptor.isEnabled() || descriptor.key().equals(enabled)) continue;
 
             CompatibilityLayerImpl layer = descriptor.getCompatibilityLayer();
@@ -134,8 +134,9 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         enablePaperAccessHook();
 
         descriptors.forEach(descriptor -> {
-            descriptor.reload(descriptor.getJar(), false, false, Set.of());
+            assert descriptor.getJar() != null && corePlugin != null;
             descriptor.corePlugin(corePlugin);
+            descriptor.reload(descriptor.getJar(), false, false, Set.of());
         });
         descriptors.forEach(ModuleDescriptorImpl::setupCompatibility);
 

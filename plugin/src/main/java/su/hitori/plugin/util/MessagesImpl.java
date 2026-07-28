@@ -4,13 +4,13 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import su.hitori.api.util.Messages;
 import su.hitori.api.util.Text;
-import su.hitori.plugin.HitoriConfiguration;
+import su.hitori.plugin.CoreConfiguration;
 
 public final class MessagesImpl implements Messages {
 
-    private final HitoriConfiguration configuration;
+    private final CoreConfiguration configuration;
 
-    public MessagesImpl(HitoriConfiguration configuration) {
+    public MessagesImpl(CoreConfiguration configuration) {
         this.configuration = configuration;
     }
 
@@ -21,12 +21,12 @@ public final class MessagesImpl implements Messages {
         var cfg = configuration.messagesUtilPrefixes;
         return Component.empty()
                 .colorIfAbsent(TextColor.color(0xFFFFFF))
-                .append(Text.create(switch (type) {
+                .append(Text.create((switch (type) {
                     case INFO -> cfg.info;
                     case ERROR -> cfg.error;
                     case WARNING -> cfg.warning;
                     default -> throw new IllegalStateException("Unexpected value: " + type);
-                }))
+                }).get()))
                 .append(component);
     }
 

@@ -9,9 +9,17 @@ dependencies {
     paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     api("org.json:json:${property("json_version")}")
     api("net.elytrium:serializer:${property("serializer_version")}")
+
+    testImplementation(platform("org.junit:junit-bom:5.10.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.junit.platform:junit-platform-launcher")
 }
 
 tasks {
+    test {
+        useJUnitPlatform()
+    }
+
     jar {
         archiveBaseName.set("hitori-api")
     }

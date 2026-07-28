@@ -10,6 +10,7 @@ import java.nio.file.Path;
  * A class holding configuration based on Elytrium library.
  * For use reference check: <a href="https://github.com/Elytrium/java-serializer">Elytrium/java-serializer</a>
  */
+@Deprecated(since = "1.2.0")
 public abstract class Configuration extends YamlSerializable {
 
     public Configuration(Path path) {

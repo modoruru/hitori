@@ -1,5 +1,7 @@
 package su.hitori.api.util;
 
+import org.jspecify.annotations.Nullable;
+
 @SuppressWarnings("unchecked")
 public final class UnsafeUtil {
 
@@ -10,7 +12,8 @@ public final class UnsafeUtil {
     /**
      * Tries to cast passed argument to E type. On fail, returns null.
      */
-    public static <E> E cast(Object object) {
+    @SuppressWarnings("DataFlowIssue") // intellij idea gone crazy
+    public static <E> @Nullable E cast(Object object) {
         try {
             return (E) object;
         }

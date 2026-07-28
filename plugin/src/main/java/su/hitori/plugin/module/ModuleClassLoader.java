@@ -53,7 +53,7 @@ final class ModuleClassLoader extends URLClassLoader implements ModuleInitialize
     }
 
     public Class<?> loadClass(ModuleDescriptorImpl descriptor, String name, boolean resolve) throws ClassNotFoundException {
-        if(descriptor == null || descriptor == moduleDescriptor) throw new IllegalArgumentException("illegal descriptor present");
+        if(descriptor == moduleDescriptor) throw new IllegalArgumentException("illegal descriptor present");
         injected.add(descriptor);
         return loadClass(name, resolve);
     }

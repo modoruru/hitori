@@ -29,4 +29,6 @@ public interface Hitori {
 
     ServerCoreInfo serverCoreInfo();
 
+    HitoriRegistryAccess registryAccess();
+
 }

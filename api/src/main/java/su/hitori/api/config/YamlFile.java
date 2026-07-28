@@ -7,6 +7,7 @@ import su.hitori.api.util.LoggerUtil;
 import java.io.File;
 import java.util.logging.Logger;
 
+@Deprecated(since = "1.2.0")
 public class YamlFile extends YamlConfiguration {
 
     private static final Logger LOGGER = LoggerFactory.instance().create();

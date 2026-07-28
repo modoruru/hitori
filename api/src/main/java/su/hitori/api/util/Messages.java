@@ -1,12 +1,17 @@
 package su.hitori.api.util;
 
+import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.Optional;
 
+/**
+ * Small tool for creating beauty log-messages sent (often) to the players.
+ */
 public interface Messages {
 
     Type
@@ -16,6 +21,7 @@ public interface Messages {
             WARNING = Type.WARNING;
 
     @SuppressWarnings("DataFlowIssue")
+    @ApiStatus.Internal
     static Component createStatic(Type type, Component component) {
         return Optional.ofNullable(Bukkit.getServer().getServicesManager().getRegistration(Messages.class))
                 .map(RegisteredServiceProvider::getProvider)
@@ -48,10 +54,14 @@ public interface Messages {
         }
 
         /**
-         * Uses {@link Text#create(String)} to create text using {@link MiniMessage}
+         * Uses {@link Text#create(String)} to create text component using {@link MiniMessage}
          */
         public Component create(String text) {
             return createStatic(this, Text.create(text));
+        }
+
+        public void createAndSendToSender(CommandSourceStack source, String text) {
+            source.getSender().sendMessage(create(text));
         }
 
         public Component text(String text) {

@@ -1,7 +1,6 @@
 package su.hitori.plugin.module.compatibility;
 
 import net.kyori.adventure.key.Key;
-import org.jetbrains.annotations.NotNull;
 import su.hitori.api.module.compatibility.CompatibilityLayer;
 
 import java.util.HashMap;
@@ -17,14 +16,14 @@ public final class CompatibilityLayerImpl implements CompatibilityLayer {
     public boolean frozen;
 
     @Override
-    public CompatibilityLayer require(@NotNull Key key) {
+    public CompatibilityLayer require(Key key) {
         if(frozen) return this;
         required.add(key);
         return this;
     }
 
     @Override
-    public CompatibilityLayer addEnableHook(@NotNull Key key, @NotNull Runnable runnable) {
+    public CompatibilityLayer addEnableHook(Key key, Runnable runnable) {
         if(frozen) return this;
         enableHooks.put(key, runnable);
         return this;
