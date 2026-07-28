@@ -401,7 +401,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
             RegisteredFieldListener registeredFieldListener = fieldListeners.get(descriptor.key());
             if(registeredFieldListener == null) return null;
 
-            registeredFieldListener = new RegisteredFieldListener(descriptor, fieldListener);
+            registeredFieldListener = new RegisteredFieldListener(descriptor, fieldListener, () -> fieldListeners.remove(descriptor.key()));
             fieldListeners.put(descriptor.key(), registeredFieldListener);
             return registeredFieldListener;
         }
