@@ -14,10 +14,16 @@ public final class ExampleConfiguration extends SectionScheme {
     public final Field<List<String>> strings = Field.createList(List.of(
             "string 1", "string 2", "string 3"
     ), String.class);
+    public final Field<ExampleEnum> coolValue = Field.create(ExampleConfiguration.ExampleEnum.SECOND_COOL_VALUE);
 
     public static final class Messages extends SectionScheme {
         public final Field<String> join = Field.create("%s joined");
         public final Field<String> quit = Field.create("%s quit");
+    }
+
+    public enum ExampleEnum {
+        VERY_COOL_VALUE,
+        SECOND_COOL_VALUE
     }
 
 }

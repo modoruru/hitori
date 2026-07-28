@@ -2,6 +2,7 @@ package su.hitori.api.configuration;
 
 import org.jspecify.annotations.Nullable;
 import su.hitori.api.configuration.exception.IllegalSchemeException;
+import su.hitori.api.util.NameFormatter;
 import su.hitori.api.util.UnsafeUtil;
 
 import java.lang.reflect.Modifier;
@@ -70,6 +71,10 @@ public abstract class SectionScheme {
             String internalFieldName = internalField.getName();
             if(!Modifier.isPublic(modifiers)) throw new IllegalSchemeException("Scheme node %s should be public", internalFieldName);
             if(!Modifier.isFinal(modifiers)) throw new IllegalSchemeException("Scheme node %s should be final", internalFieldName);
+
+            String asSnakeCase = NameFormatter.fromAnyCase(internalFieldName).toSnake();
+            if(!NameFormatter.fromAnyCase(asSnakeCase).toCamel().equals(internalFieldName))
+                throw new IllegalSchemeException("Node %s name can't be safely converted using NameFormatter. Consider using default camelCase naming for nodes.");
         }
     }
 

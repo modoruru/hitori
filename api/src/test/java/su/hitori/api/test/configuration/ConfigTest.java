@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import su.hitori.api.configuration.HitoriConfiguration;
+import su.hitori.api.configuration.serializer.JSONSerializer;
+import su.hitori.api.configuration.serializer.Serializer;
 import su.hitori.api.configuration.serializer.YAMLSerializer;
 
 import java.io.*;
@@ -27,22 +29,16 @@ public final class ConfigTest {
     }
 
     @Test
-    public void testWrite(@TempDir Path tempDir) throws IOException {
-        HitoriConfiguration<ExampleConfiguration> exampleConfig = HitoriConfiguration.create(
-                Key.key("hitori", "example"),
-                new ExampleConfiguration(),
-                null
-        );
-        exampleConfig.defaults();
-
-        try (FileOutputStream fos = new FileOutputStream(tempDir.resolve("example.yml").toFile())) {
-            exampleConfig.write(YAMLSerializer.INSTANCE, fos);
-            fos.flush();
-        }
+    public void testReadYAML(@TempDir Path tempDir) throws IOException {
+        testRead(tempDir, YAMLSerializer.INSTANCE, "yml");
     }
 
     @Test
-    public void testRead(@TempDir Path tempDir) throws IOException {
+    public void testReadJSON(@TempDir Path tempDir) throws IOException {
+        testRead(tempDir, JSONSerializer.INSTANCE, "json");
+    }
+
+    private void testRead(Path tempDir, Serializer serializer, String extension) throws IOException {
         HitoriConfiguration<ExampleConfiguration> exampleConfig = HitoriConfiguration.create(
                 Key.key("hitori", "example"),
                 new ExampleConfiguration(),
@@ -56,14 +52,14 @@ public final class ConfigTest {
 
         access.section.join.set("%s joined the server");
 
-        File file = tempDir.resolve("example.yml").toFile();
+        File file = tempDir.resolve("example." + extension).toFile();
         try (FileOutputStream fos = new FileOutputStream(file)) {
-            exampleConfig.write(YAMLSerializer.INSTANCE, fos);
+            exampleConfig.write(serializer, fos);
             fos.flush();
         }
 
         try (FileInputStream fis = new FileInputStream(file)) {
-            exampleConfig.read(YAMLSerializer.INSTANCE, fis);
+            exampleConfig.read(serializer, fis);
         }
 
         Assertions.assertEquals("string", access.string.get());

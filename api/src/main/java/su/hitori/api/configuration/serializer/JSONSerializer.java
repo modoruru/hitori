@@ -1,54 +1,44 @@
 package su.hitori.api.configuration.serializer;
 
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import su.hitori.api.configuration.Field;
 import su.hitori.api.configuration.SectionScheme;
+import su.hitori.api.configuration.exception.InternalException;
+import su.hitori.api.util.JSONUtil;
 import su.hitori.api.util.NameFormatter;
 import su.hitori.api.util.SafeUtil;
 import su.hitori.api.util.UnsafeUtil;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-public final class YAMLSerializer implements Serializer {
+public final class JSONSerializer implements Serializer {
 
-    public static final YAMLSerializer INSTANCE = new YAMLSerializer();
+    public static JSONSerializer INSTANCE = new JSONSerializer();
 
-    private final Yaml yaml;
-
-    private YAMLSerializer() {
-        DumperOptions dumperOptions = new DumperOptions();
-        dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        dumperOptions.setPrettyFlow(true);
-        this.yaml = new Yaml(dumperOptions);
-    }
+    private JSONSerializer() {}
 
     @Override
     public void write(SectionScheme.Node rootSchemeNode, Map<String, Object> rawData, OutputStream output) {
-        // build map for proper saving
-        Map<String, Object> map = new HashMap<>();
+        JSONObject body = new JSONObject();
 
         assert rootSchemeNode.section() != null;
-        writeSection("", rootSchemeNode, rawData, map);
+        writeSection("", rootSchemeNode, rawData, body);
 
         try (OutputStreamWriter writer = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
-            yaml.dump(map, writer);
+            body.write(writer, 2, 0);
         }
         catch (IOException exception) {
             throw new IllegalArgumentException(exception);
         }
     }
 
-    private static void writeSection(String absolutePath, SectionScheme.Node node, Map<String, Object> rawData, Map<String, Object> results) {
+    private static void writeSection(String absolutePath, SectionScheme.Node node, Map<String, Object> rawData, JSONObject body) {
         String pathPrefix;
         if(absolutePath.isEmpty()) pathPrefix = absolutePath;
         else pathPrefix = absolutePath + '.';
@@ -62,19 +52,22 @@ public final class YAMLSerializer implements Serializer {
 
             Object resultValue = switch (embeddedNode.nodeType()) {
                 case SECTION -> {
-                    Map<String, Object> embeddedNodeResults = new HashMap<>();
-                    writeSection(pathPrefix + nodeName, embeddedNode, rawData, embeddedNodeResults);
-                    yield embeddedNodeResults;
+                    JSONObject embeddedNodeBody = new JSONObject();
+                    writeSection(pathPrefix + nodeName, embeddedNode, rawData, embeddedNodeBody);
+                    yield embeddedNodeBody;
                 }
                 case PRIMITIVE -> {
                     Field<?> field = embeddedNode.field();
                     assert field != null;
 
-                    Object valueToWrite = rawData.get(pathPrefix + nodeName);
-                    if(valueToWrite == null) valueToWrite = field.defaultValue();
+                    Object rawValue = rawData.get(pathPrefix + nodeName);
+                    if(rawValue != null) {
+                        if(rawValue instanceof Enum<?> asEnum) yield asEnum.name();
 
-                    if(valueToWrite instanceof Enum<?> asEnum) yield asEnum.name();
-                    yield valueToWrite;
+                        yield rawValue;
+                    }
+
+                    yield field.defaultValue();
                 }
                 case LIST -> {
                     Field<?> field = embeddedNode.field();
@@ -82,12 +75,12 @@ public final class YAMLSerializer implements Serializer {
 
                     Object rawValue = rawData.get(pathPrefix + nodeName);
 
-                    List<Object> resultList = new ArrayList<>();
+                    JSONArray resultList = new JSONArray();
                     List<Object> rawList = UnsafeUtil.cast(rawValue == null ? field.defaultValue() : rawValue);
                     assert rawList != null;
 
                     for (Object object : rawList) {
-                        resultList.add(switch (object) {
+                        resultList.put(switch (object) {
                             case SectionScheme _ -> throw new UnsupportedOperationException("Serializing lists of sections is not supported yet, sorry for the inconvenience.");
                             case Enum<?> asEnum -> asEnum.name();
                             default -> object;
@@ -98,28 +91,34 @@ public final class YAMLSerializer implements Serializer {
                 }
             };
 
-            results.put(snakeCaseName, resultValue);
+            body.put(snakeCaseName, resultValue);
         }
     }
 
     @Override
     public void read(Logger logger, SectionScheme.Node rootSchemeNode, InputStream input, Map<String, Object> results) {
-        Map<String, Object> map = yaml.load(input);
-        if(map.isEmpty()) return;
+        JSONObject body;
+        try (InputStreamReader reader = new InputStreamReader(input)) {
+            body = JSONUtil.read(reader);
+        }
+        catch (IOException exception) {
+            throw new InternalException(exception);
+        }
 
-        readSection(logger, "", map, rootSchemeNode, results);
+        if(body.isEmpty()) return;
+
+        readSection(logger, "", body, rootSchemeNode, results);
     }
 
-    private static void readSection(Logger logger, String absolutePath, Map<String, Object> section, SectionScheme.Node node, Map<String, Object> results) {
+    private static void readSection(Logger logger, String absolutePath, JSONObject sectionBody, SectionScheme.Node node, Map<String, Object> results) {
         assert node.section() != null;
 
         String pathPrefix;
         if(absolutePath.isEmpty()) pathPrefix = absolutePath;
         else pathPrefix = absolutePath + '.';
 
-        for (Map.Entry<String, Object> entry : section.entrySet()) {
-            String snakeCaseName = entry.getKey();
-            Object value = entry.getValue();
+        for (String snakeCaseName : sectionBody.keySet()) {
+            Object value = sectionBody.get(snakeCaseName);
 
             String convertedName = NameFormatter.fromAnyCase(snakeCaseName).toCamel();
 
@@ -135,7 +134,7 @@ public final class YAMLSerializer implements Serializer {
 
             switch (correspondingNode.nodeType()) {
                 case SECTION -> {
-                    Map<String, Object> embeddedSection = UnsafeUtil.cast(value);
+                    JSONObject embeddedSection = UnsafeUtil.cast(value);
                     if(embeddedSection == null) {
                         logger.warning(String.format(
                                 "node type mismatch: %s%s defined as %s in scheme, but the attempt to cast it was failed.",
@@ -161,7 +160,7 @@ public final class YAMLSerializer implements Serializer {
                     Field<?> field = correspondingNode.field();
                     assert field != null;
 
-                    List<Object> rawList = UnsafeUtil.cast(value);
+                    JSONArray rawList = UnsafeUtil.cast(value);
                     assert rawList != null;
 
                     List<Object> list = new ArrayList<>();
@@ -172,7 +171,7 @@ public final class YAMLSerializer implements Serializer {
                         list.add(SafeUtil.enumValueOf(UnsafeUtil.cast(field.listType()), UnsafeUtil.cast(object)));
                     }
                     else if(SectionScheme.class.isAssignableFrom(field.listType())) throw new UnsupportedOperationException("Deserializing lists of sections is not supported yet, sorry for the inconvenience.");
-                    else list.addAll(rawList);
+                    else list.addAll(rawList.toList());
 
                     results.put(pathPrefix + convertedName, list);
                 }
