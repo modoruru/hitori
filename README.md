@@ -24,8 +24,6 @@ Also, you can get module from [Releases](https://github.com/modoruru/hitori/rele
 After downloading the jar, just put it into plugins folder.
 
 ## API
-hitori's API is published via [JitPack](https://jitpack.io). Latest version: [![](https://jitpack.io/v/modoruru/hitori.svg)](https://jitpack.io/#modoruru/hitori)
-
 > [!NOTE]
 > We DO NOT include Paper API in our .pom, so you should add it by yourself.
 
@@ -33,37 +31,33 @@ hitori's API is published via [JitPack](https://jitpack.io). Latest version: [![
 <summary>maven</summary>
 
 ```xml
-	<repositories>
-		<repository>
-		    <id>jitpack.io</id>
-		    <url>https://jitpack.io</url>
-		</repository>
-	</repositories>
+<repository>
+    <id>modoru-releases</id>
+    <name>modoru repository</name>
+    <url>https://repository.modoru.fun/releases</url>
+</repository>
 ```
 
 ```xml
-	<dependency>
-	    <groupId>com.github.modoruru</groupId>
-	    <artifactId>hitori</artifactId>
-	    <version>version</version>
-	</dependency>
+<dependency>
+    <groupId>su.hitori</groupId>
+    <artifactId>hitori</artifactId>
+    <version>1.2.0</version>
+</dependency>
 ```
 </details>
 <details>
 <summary>gradle</summary>
 
 ```groovy
-repositories {
-    // ...
-    maven { url 'https://jitpack.io' }
+maven {
+    name = "modoruReleases"
+    url = uri("https://repository.modoru.fun/releases")
 }
 ```
 
 ```groovy
-dependencies {
-    // ...
-    implementation 'com.github.modoruru:hitori:version'
-}
+implementation("su.hitori:hitori:1.2.0")
 ```
 </details>
 

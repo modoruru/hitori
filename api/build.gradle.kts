@@ -31,8 +31,21 @@ tasks {
 }
 
 publishing {
+    repositories {
+        maven {
+            name = "modoruReleases"
+            url = uri("https://repository.modoru.fun/releases")
+
+            credentials {
+                username = System.getenv("REPOSILITE_USERNAME") ?: ""
+                password = System.getenv("REPOSILITE_TOKEN") ?: ""
+            }
+        }
+    }
+
     publications {
         create<MavenPublication>("maven") {
+            groupId = rootProject.group.toString()
             artifactId = rootProject.name
             version = rootProject.version.toString()
 
