@@ -1,4 +1,4 @@
-name: Publish to Reposilite
+name: Publish to modoru releases
 
 on:
   release:
@@ -27,7 +27,7 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Publish to Reposilite
+      - name: Publish to modoru releases
         env:
           REPOSILITE_USERNAME: ${{ secrets.REPOSILITE_USERNAME }}
           REPOSILITE_TOKEN: ${{ secrets.REPOSILITE_TOKEN }}
