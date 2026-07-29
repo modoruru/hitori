@@ -29,7 +29,7 @@ jobs:
 
       - name: Publish to modoru releases
         env:
-          REPOSILITE_USERNAME: ${{ secrets.REPOSILITE_USERNAME }}
-          REPOSILITE_TOKEN: ${{ secrets.REPOSILITE_TOKEN }}
+          MODORU_USERNAME: ${{ secrets.MODORU_USERNAME }}
+          MODORU_TOKEN: ${{ secrets.MODORU_TOKEN }}
         run: |
           ./gradlew api:publish

@@ -37,8 +37,8 @@ publishing {
             url = uri("https://repository.modoru.fun/releases")
 
             credentials {
-                username = System.getenv("REPOSILITE_USERNAME") ?: ""
-                password = System.getenv("REPOSILITE_TOKEN") ?: ""
+                username = System.getenv("MODORU_USERNAME") ?: ""
+                password = System.getenv("MODORU_TOKEN") ?: ""
             }
         }
     }
