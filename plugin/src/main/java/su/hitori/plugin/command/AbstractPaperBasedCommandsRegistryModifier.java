@@ -8,7 +8,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.registrar.ReloadableRegistrarEvent;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
-import net.kyori.adventure.key.Key;
 import net.minecraft.server.MinecraftServer;
 import org.jspecify.annotations.Nullable;
 import su.hitori.api.command.CommandsModificationInfo;
@@ -19,7 +18,6 @@ import su.hitori.plugin.CorePlugin;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
 
 public abstract class AbstractPaperBasedCommandsRegistryModifier implements CommandsRegistryModifier {
 
@@ -93,8 +91,7 @@ public abstract class AbstractPaperBasedCommandsRegistryModifier implements Comm
             for (String command : Set.copyOf(map.keySet())) {
                 if(command.indexOf(':') == -1) continue;
 
-                Key key = Key.key(command);
-                if(key.value().equalsIgnoreCase(commandName)) map.remove(command);
+                if(command.split(":")[1].equalsIgnoreCase(commandName)) map.remove(command);
             }
         });
     }

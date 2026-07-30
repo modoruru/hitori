@@ -126,7 +126,7 @@ public final class Task {
 
     public static Task runTaskTimerAsync(Runnable runnable, long delay, long period) {
         return runningFolia
-                ? new Task(server().getAsyncScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), delay * 50L, period, TimeUnit.MILLISECONDS))
+                ? new Task(server().getAsyncScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), delay * 50L, period * 50L, TimeUnit.MILLISECONDS))
                 : new Task(Bukkit.getScheduler().runTaskTimerAsynchronously(plugin(), runnable, delay, period));
     }
 
