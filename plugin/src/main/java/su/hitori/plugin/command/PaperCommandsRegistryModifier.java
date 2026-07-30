@@ -4,14 +4,14 @@ import org.bukkit.Bukkit;
 import su.hitori.api.util.Task;
 import su.hitori.plugin.CorePlugin;
 
-public final class PaperCommandRegistryModifier extends AbstractPaperBasedCommandsRegistryModifier {
+public final class PaperCommandsRegistryModifier extends AbstractPaperBasedCommandsRegistryModifier {
 
-    public PaperCommandRegistryModifier(CorePlugin corePlugin) {
+    public PaperCommandsRegistryModifier(CorePlugin corePlugin) {
         super(corePlugin);
     }
 
     @Override
-    protected void reload() {
+    public void reload() {
         Task.ensureSync(Bukkit::reloadData);
     }
 

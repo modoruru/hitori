@@ -9,6 +9,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.jetbrains.annotations.Nullable;
 import su.hitori.api.HitoriRegistryAccess;
+import su.hitori.api.command.CommandsModificationInfo;
 import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.logging.LoggerFactory;
 import su.hitori.api.module.Module;
@@ -69,6 +70,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     private @Nullable CompatibilityLayerImpl compatibilityLayer;
 
     private @Nullable EnableContext lastEnableContext;
+    private @Nullable CommandsModificationInfo commandsModificationInfo;
     private final Set<ModuleDescriptorImpl> injected = new HashSet<>();
     private boolean bootstrapClassloaderSkip = true;
     private boolean enabling;
@@ -184,10 +186,9 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                 }, 1L);
             }
 
-            corePlugin.commandRegistryModifier().applyModificationsInBatch(
+            commandsModificationInfo = corePlugin.commandRegistryModifier().applyModificationsInBatch(
                     commandsRegistrar.commands,
-                    Set.of(),
-                    true
+                    Set.of()
             );
 
             for (Map.Entry<Key, HitoriConfiguration<?>> entry : configurationsRegistrar.configurations.entrySet()) {
@@ -254,13 +255,10 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             });
         }
 
-        corePlugin.commandRegistryModifier().applyModificationsInBatch(
-                List.of(),
-                commandsRegistrar.commands.stream()
-                        .map(LiteralCommandNode::getLiteral)
-                        .collect(Collectors.toSet()),
-                true
-        );
+        if(commandsModificationInfo != null) {
+            corePlugin.commandRegistryModifier().undoBatch(commandsModificationInfo);
+            commandsModificationInfo = null;
+        }
 
         listenersRegistrar.listeners.clear();
         commandsRegistrar.oldCommands.clear();

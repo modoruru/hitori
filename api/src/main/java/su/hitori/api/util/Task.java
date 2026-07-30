@@ -66,8 +66,8 @@ public final class Task {
             return;
         }
 
-        if(sync) Bukkit.getScheduler().runTask(plugin(), runnable);
-        else Bukkit.getScheduler().runTaskAsynchronously(plugin(), runnable);
+        if(sync) Bukkit.getGlobalRegionScheduler().run(plugin(), _ -> runnable.run());
+        else Bukkit.getAsyncScheduler().runNow(plugin(), _ -> runnable.run());
     }
 
     public static Task runGlobally(Runnable runnable, long delay) {

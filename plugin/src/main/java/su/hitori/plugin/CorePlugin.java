@@ -12,6 +12,7 @@ import su.hitori.api.Hitori;
 import su.hitori.api.HitoriHolder;
 import su.hitori.api.HitoriRegistryAccess;
 import su.hitori.api.ServerCoreInfo;
+import su.hitori.api.command.CommandsRegistryModifier;
 import su.hitori.api.configuration.ConfigurationSource;
 import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.configuration.serializer.YAMLSerializer;
@@ -22,9 +23,9 @@ import su.hitori.api.registry.Registry;
 import su.hitori.api.registry.RegistryKey;
 import su.hitori.api.util.Messages;
 import su.hitori.api.util.UnsafeUtil;
-import su.hitori.plugin.command.CommandRegistryModifier;
+import su.hitori.plugin.command.AbstractPaperBasedCommandsRegistryModifier;
 import su.hitori.plugin.command.FoliaCommandsRegistryModifier;
-import su.hitori.plugin.command.PaperCommandRegistryModifier;
+import su.hitori.plugin.command.PaperCommandsRegistryModifier;
 import su.hitori.plugin.container.ContainerListener;
 import su.hitori.plugin.module.ModuleRepositoryImpl;
 import su.hitori.plugin.util.MessagesImpl;
@@ -41,7 +42,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
 
     private final Registry<HitoriConfiguration<?>> configurationRegistry;
 
-    private @Nullable CommandRegistryModifier commandRegistryModifier;
+    private @Nullable AbstractPaperBasedCommandsRegistryModifier commandRegistryModifier;
 
     CorePlugin(LoggerFactory loggerFactory, ModuleRepositoryImpl moduleRepository) {
         this.loggerFactory = loggerFactory;
@@ -56,7 +57,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
     @Override
     public void onEnable() {
         if(serverCoreInfo.isFolia()) commandRegistryModifier = new FoliaCommandsRegistryModifier(this);
-        else commandRegistryModifier = new PaperCommandRegistryModifier(this);
+        else commandRegistryModifier = new PaperCommandsRegistryModifier(this);
 
         HitoriConfiguration<CoreConfiguration> coreConfiguration = HitoriConfiguration.create(
                 Key.key("hitori", "core"),
@@ -76,15 +77,16 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
 
         HitoriHolder.set(this);
 
+        Runnable reloadCommands = commandRegistryModifier.scheduleReload();
         commandRegistryModifier.applyModificationsInBatch(
                 List.of(HitoriCommand.boostrap(this)),
-                Set.of(),
-                false
+                Set.of()
         );
 
         loadOtherAPIImplementations();
 
         moduleRepository.enableAll();
+        reloadCommands.run();
     }
 
     private void loadOtherAPIImplementations() {
@@ -124,7 +126,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
         return this;
     }
 
-    public CommandRegistryModifier commandRegistryModifier() {
+    public AbstractPaperBasedCommandsRegistryModifier commandRegistryModifier() {
         assert commandRegistryModifier != null;
         return commandRegistryModifier;
     }

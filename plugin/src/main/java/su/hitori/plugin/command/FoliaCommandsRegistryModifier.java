@@ -17,7 +17,7 @@ public final class FoliaCommandsRegistryModifier extends AbstractPaperBasedComma
     }
 
     @Override
-    protected void reload() {
+    public void reload() {
         PaperCommands.INSTANCE.setValid();
         LifecycleEventRunner.INSTANCE.callReloadableRegistrarEvent(
                 LifecycleEvents.COMMANDS,

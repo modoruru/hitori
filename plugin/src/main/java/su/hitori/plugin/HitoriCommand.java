@@ -461,7 +461,9 @@ final class HitoriCommand {
             }
         }
         assert impl.getJar() != null;
+        Runnable runnable = corePlugin.commandRegistryModifier().scheduleReload();
         impl.reload(impl.getJar(), true, true, Set.of());
+        runnable.run();
         sender.sendMessage(Messages.INFO.create("Module successfully reloaded."));
 
         return 1;

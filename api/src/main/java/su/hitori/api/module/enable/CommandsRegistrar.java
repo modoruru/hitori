@@ -15,7 +15,7 @@ public interface CommandsRegistrar {
      * Registers a collection of commands assigned to this module
      * @param commands collection containing commands to register
      * @return this CommandsRegistrar
-     * @deprecated would be removed in 1.2.0
+     * @deprecated would be removed in future releases
      */
     @Deprecated(forRemoval = true, since = "1.2.0")
     CommandsRegistrar register(Collection<CommandAPICommand> commands);
@@ -24,7 +24,7 @@ public interface CommandsRegistrar {
      * Registers an array of commands assigned to this module
      * @param commands array containing commands to register
      * @return this CommandsRegistrar
-     * @deprecated would be removed in 1.2.0
+     * @deprecated would be removed in future releases
      */
     @Deprecated(forRemoval = true, since = "1.2.0")
     CommandsRegistrar register(CommandAPICommand... commands);
