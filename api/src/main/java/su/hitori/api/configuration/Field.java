@@ -68,6 +68,24 @@ public final class Field<T> {
         this.info = info;
     }
 
+    private void checkType(Object rawValue) {
+        if((type == Float.class && rawValue instanceof Double)) return;
+
+        if(!type.isInstance(rawValue)) throw InternalException.formatted(
+                "Type mismatch: value present in config is not an instance of %s, it is actually instance of %s",
+                type.getName(),
+                rawValue.getClass().getName()
+        );
+    }
+
+    private T cast(Object rawValue) {
+        if(type == Float.class && rawValue instanceof Double asDouble) return type.cast(asDouble.floatValue());
+
+        T returnValue = UnsafeUtil.cast(rawValue);
+        assert returnValue != null;
+        return returnValue;
+    }
+
     /**
      * @return actual value of the field
      * @throws IllegalStateException if method is called outside the {@link HitoriConfiguration#access}
@@ -89,11 +107,7 @@ public final class Field<T> {
             return defaultValue;
         }
 
-        if(!type.isInstance(rawValue)) throw InternalException.formatted(
-                "Type mismatch: value present in config is not an instance of %s, it is actually instance of %s",
-                type.getName(),
-                rawValue.getClass().getName()
-        );
+        checkType(rawValue);
 
         // if T is a list, return copy of it
         if(List.class == type) {
@@ -103,9 +117,7 @@ public final class Field<T> {
             rawValue = new ArrayList<>(valueAsList);
         }
 
-        T returnValue = UnsafeUtil.cast(rawValue);
-        assert returnValue != null;
-        return returnValue;
+        return cast(rawValue);
     }
 
     /**
@@ -121,14 +133,10 @@ public final class Field<T> {
         if(rawCurrentValue == null && value == null) return null;
 
         if(rawCurrentValue != null && value == null) {
-            if(!type.isInstance(rawCurrentValue)) throw InternalException.formatted(
-                    "Type mismatch: value present in config is not an instance of %s, it is actually instance of %s",
-                    type.getName(),
-                    rawCurrentValue.getClass().getName()
-            );
+            checkType(rawCurrentValue);
 
             context.set(info, null);
-            return UnsafeUtil.cast(rawCurrentValue);
+            return cast(rawCurrentValue);
         }
 
         if(List.class == type) {

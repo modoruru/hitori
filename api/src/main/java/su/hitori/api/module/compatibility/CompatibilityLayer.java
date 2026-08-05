@@ -1,7 +1,6 @@
 package su.hitori.api.module.compatibility;
 
 import net.kyori.adventure.key.Key;
-import org.jetbrains.annotations.NotNull;
 import su.hitori.api.module.Module;
 
 /**
@@ -17,7 +16,7 @@ public interface CompatibilityLayer {
      * If it doesn't exist, module will not be loaded
      * @return that CompatibilityLayer
      */
-    CompatibilityLayer require(@NotNull Key key);
+    CompatibilityLayer require(Key key);
 
     /**
      * Adds a hook to other module enabling. If module with specified key enables, the hook will be called.
@@ -25,6 +24,6 @@ public interface CompatibilityLayer {
      * @param runnable hook itself
      * @return that CompatibilityLayer
      */
-    CompatibilityLayer addEnableHook(@NotNull Key key, @NotNull Runnable runnable);
+    CompatibilityLayer addEnableHook(Key key, Runnable runnable);
 
 }
