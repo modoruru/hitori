@@ -95,7 +95,9 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
 
     @Override
     public void onDisable() {
+        Runnable reloadCommands = commandRegistryModifier.scheduleReload();
         moduleRepository.disableAll();
+        reloadCommands.run();
     }
 
     @Override
