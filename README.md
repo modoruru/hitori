@@ -1,4 +1,4 @@
-# ひとり
+# ひとり (一人)
 hitori - "alone" (adverb) from japanese
 
 hitori is a server-side framework for Minecraft based on the PaperMC plugin.\
