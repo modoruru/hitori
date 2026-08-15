@@ -1,7 +1,4 @@
-package su.hitori.api.test.configuration;
-
-import su.hitori.api.configuration.Field;
-import su.hitori.api.configuration.SectionScheme;
+package su.hitori.api.configuration;
 
 import java.util.List;
 

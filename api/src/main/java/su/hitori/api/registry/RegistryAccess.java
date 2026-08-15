@@ -15,4 +15,8 @@ public interface RegistryAccess {
      */
     <E extends Keyed> Optional<Registry<E>> access(RegistryKey<E> key) throws IllegalAccessError;
 
+    default <E extends Keyed> Registry<E> accessOrThrow(RegistryKey<E> key) {
+        return access(key).orElseThrow();
+    }
+
 }

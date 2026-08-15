@@ -1,8 +1,7 @@
 package su.hitori.api.util;
 
 import net.kyori.adventure.key.Key;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -26,7 +25,7 @@ public class Pipeline<T> implements Iterable<T> {
         addAfter(null, key, newObject);
     }
 
-    public void addAfter(Key baseObject, @NotNull Key newObject, @NotNull T object) {
+    public void addAfter(@Nullable Key baseObject, Key newObject, T object) {
         if(order.contains(newObject)) return;
 
         int baseIndex = order.indexOf(baseObject);
@@ -44,7 +43,7 @@ public class Pipeline<T> implements Iterable<T> {
      * @param newObject key of the new object
      * @param object new object
      */
-    public void addBefore(Key baseObject, @NotNull Key newObject, @NotNull T object) {
+    public void addBefore(@Nullable Key baseObject, Key newObject, T object) {
         if(order.contains(newObject)) return;
 
         int baseIndex = order.indexOf(baseObject);

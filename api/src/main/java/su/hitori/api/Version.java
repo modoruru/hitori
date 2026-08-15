@@ -1,25 +1,39 @@
 package su.hitori.api;
 
 import io.papermc.paper.ServerBuildInfo;
+import org.jetbrains.annotations.ApiStatus;
+import org.jspecify.annotations.Nullable;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Describes version based on three numbers: global, major and minor sub-versions
+ * Object representation of <a href="https://semver.org/">Semantic Versioning 2.0.0/</a> standard.
  */
 public final class Version implements Comparable<Version> {
 
-    private final int global, major, minor;
+    private static final Pattern
+            PRE_RELEASE_AND_METADATA_PATTERN = Pattern.compile("[0-9A-Za-z-]+"),
+            RAW_PATTERN = Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$");
 
-    public Version(int global, int major) {
-        this(global, major, 0);
+    private final int major, minor, patch;
+    private final @Nullable String preRelease, metadata;
+
+    public Version(int major, int minor) {
+        this(major, minor, 0, null, null);
     }
 
-    public Version(int global, int major, int minor) {
-        if(global < 0) throw new IllegalArgumentException("global version can't be below zero");
-        if(major < 0) throw new IllegalArgumentException("major version can't be below zero");
-        if(minor < 0) throw new IllegalArgumentException("minor version can't be below zero");
-        this.global = global;
+    public Version(int major, int minor, int patch, @Nullable String preRelease, @Nullable String metadata) {
+        if(major < 0) throw new IllegalArgumentException("global version can't be below zero");
+        if(minor < 0) throw new IllegalArgumentException("major version can't be below zero");
+        if(patch < 0) throw new IllegalArgumentException("minor version can't be below zero");
+        if(preRelease != null && !PRE_RELEASE_AND_METADATA_PATTERN.matcher(preRelease).find()) throw new IllegalArgumentException("Pre-release appendix should be [0-9A-Za-z-]+");
+        if(metadata != null && !PRE_RELEASE_AND_METADATA_PATTERN.matcher(metadata).find()) throw new IllegalArgumentException("Metadata appendix should be [0-9A-Za-z-]+");
         this.major = major;
         this.minor = minor;
+        this.patch = patch;
+        this.preRelease = preRelease;
+        this.metadata = metadata;
     }
 
     /**
@@ -29,35 +43,19 @@ public final class Version implements Comparable<Version> {
      */
     public Version(String raw) throws IllegalArgumentException {
         if(raw.isEmpty()) throw new IllegalArgumentException("empty string");
-        String[] unboxed = raw.split("\\.");
 
-        int global, major, minor = 0;
-        if(unboxed.length < 2 || unboxed.length > 3) throw new IllegalArgumentException("too many/few parts");
+        Matcher matcher = RAW_PATTERN.matcher(raw);
+        if(!matcher.matches()) throw new IllegalArgumentException("Value is not valid SemVer string representation.");
 
-        try {
-            global = Integer.parseInt(unboxed[0]);
-            major = Integer.parseInt(unboxed[1]);
-        }
-        catch (NumberFormatException e) {
-            throw new IllegalArgumentException("malformed numbers: \"" + raw + "\"");
-        }
+        major = Integer.parseInt(matcher.group(1));
+        minor = Integer.parseInt(matcher.group(2));
 
-        if(unboxed.length == 3) {
-            try {
-                minor = Integer.parseInt(unboxed[2]);
-            }
-            catch (NumberFormatException e) {
-                throw new IllegalArgumentException("malformed numbers: \"" + raw + "\"");
-            }
-        }
+        String rawPatch = matcher.group(3);
+        if(rawPatch != null) patch = Integer.parseInt(rawPatch);
+        else patch = 0;
 
-        this.global = global;
-        this.major = major;
-        this.minor = minor;
-    }
-
-    public int global() {
-        return global;
+        preRelease = matcher.group(4);
+        metadata = matcher.group(5);
     }
 
     public int major() {
@@ -68,32 +66,46 @@ public final class Version implements Comparable<Version> {
         return minor;
     }
 
+    public int patch() {
+        return patch;
+    }
+
+    public @Nullable String preRelease() {
+        return preRelease;
+    }
+
+    public @Nullable String metadata() {
+        return metadata;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if(!(obj instanceof Version version)) return false;
-        return version.global == this.global
-                && version.major == major
-                && version.minor == this.minor;
+        return version.major == this.major
+                && version.minor == minor
+                && version.patch == this.patch;
     }
 
     /**
-     * Formats version as string. If minor version equals zero, only global and major versions are added.
-     * @return string in version format
+     * Formats version as string.
+     * @return string in SemVer format
      */
     public String toString() {
         StringBuilder builder = new StringBuilder();
-        builder.append(global).append(".").append(major);
-        if(minor > 0) builder.append(".").append(minor);
+        builder.append(major).append('.').append(minor).append('.').append(patch);
+        if(preRelease != null) builder.append("-").append(preRelease);
+        if(metadata != null) builder.append("+").append(metadata);
         return builder.toString();
     }
 
     @Override
     public int compareTo(Version version) {
-        if (this.global != version.global) return Integer.compare(this.global, version.global);
-        else if (this.major != version.major) return Integer.compare(this.major, version.major);
-        return Integer.compare(this.minor, version.minor);
+        if (this.major != version.major) return Integer.compare(this.major, version.major);
+        else if (this.minor != version.minor) return Integer.compare(this.minor, version.minor);
+        return Integer.compare(this.patch, version.patch);
     }
 
+    @ApiStatus.Obsolete
     public static Version getMinecraftVersion() {
         return new Version(ServerBuildInfo.buildInfo().minecraftVersionId());
     }

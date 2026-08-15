@@ -1,10 +1,9 @@
-package su.hitori.api.test.configuration;
+package su.hitori.api.configuration;
 
 import net.kyori.adventure.key.Key;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.configuration.serializer.JSONSerializer;
 import su.hitori.api.configuration.serializer.Serializer;
 import su.hitori.api.configuration.serializer.YAMLSerializer;

@@ -4,8 +4,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.title.Title;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Duration;
 import java.util.*;
@@ -55,7 +55,7 @@ public final class Text {
      * @return collection containing all created component's
      */
     public static List<Component> create(Collection<String> input) {
-        if(input == null || input.isEmpty()) return List.of();
+        if(input.isEmpty()) return List.of();
         return input.stream().map(Text::create).toList();
     }
 
@@ -77,7 +77,7 @@ public final class Text {
      * @param input text potentially containing tags
      * @return screened text
      */
-    public static String restrictTags(@NotNull String input) {
+    public static String restrictTags(String input) {
         assert miniMessage != null;
         return miniMessage.escapeTags(input);
 //        return serialize(Component.text(input.replaceAll("(?<!\\\\)<", "\\\\<")));
@@ -108,8 +108,7 @@ public final class Text {
      * @param resolver TagResolver to add
      * @return unique id of resolver. can be used to later remove that TagResolver using {@link #removeResolver(UUID)}
      */
-    public static @Nullable UUID addResolver(TagResolver resolver) {
-        if(resolver == null) return null;
+    public static UUID addResolver(TagResolver resolver) {
         UUID uuid = UUID.randomUUID();
         additionalResolvers.put(uuid, resolver);
         createMiniMessage();
@@ -121,9 +120,8 @@ public final class Text {
      * @param uuid unique id of TagResolver you've got from {@link #addResolver(TagResolver)}
      */
     public static void removeResolver(UUID uuid) {
-        if(uuid == null) return;
-        additionalResolvers.remove(uuid);
-        createMiniMessage();
+        if(additionalResolvers.remove(uuid) != null)
+            createMiniMessage();
     }
 
     private static void createMiniMessage() {

@@ -3,8 +3,10 @@ package su.hitori.api.util;
 import su.hitori.api.Pair;
 
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Utils for files
@@ -40,9 +42,18 @@ public final class FileUtil {
      * @param text text to write to file
      */
     public static void writeTextToFile(File file, String text) {
-        try (FileWriter writer = new FileWriter(file)) {
-            writer.write(text);
-            writer.flush();
+        writeTextToFile(file, text, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Writes text to a file.
+     * @param file a file to write to
+     * @param text text to write to file
+     */
+    public static void writeTextToFile(File file, String text, Charset charset) {
+        try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
+            fileOutputStream.write(text.getBytes(charset));
+            fileOutputStream.flush();
         }
         catch (IOException e) {
             throw new RuntimeException(e);
@@ -52,7 +63,7 @@ public final class FileUtil {
     /**
      * Returns name and extension of file separated of each other.
      * @param file file to get name and extension of
-     * @return pair containing name of file, and extension (or empty string if file doesn't have extension)
+     * @return pair containing name of file, and extension (or empty string if file doesn't have an extension)
      */
     public static Pair<String, String> getNameAndExtension(File file) {
         String name = file.getName();

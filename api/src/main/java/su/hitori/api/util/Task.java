@@ -8,11 +8,12 @@ import org.bukkit.Server;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 import su.hitori.api.Hitori;
 
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * @author StreamVersus
@@ -25,16 +26,27 @@ public final class Task {
     private final @Nullable BukkitTask bukkitTask;
     private final @Nullable ScheduledTask scheduledTask;
 
-    private Task(@NotNull BukkitTask bukkitTask) {
+    private Task(BukkitTask bukkitTask) {
         if(runningFolia) throw new IllegalStateException("Creating bukkit task on folia server");
         this.bukkitTask = bukkitTask;
         this.scheduledTask = null;
     }
 
-    private Task(@NotNull ScheduledTask scheduledTask) {
+    private Task(@Nullable ScheduledTask scheduledTask) {
         if(!runningFolia) throw new IllegalStateException("Creating folia task on bukkit server");
+        if(scheduledTask == null) throw new IllegalArgumentException("Entity is already removed so task can't be created.");
         this.bukkitTask = null;
         this.scheduledTask = scheduledTask;
+    }
+
+    @ApiStatus.Internal
+    public @Nullable BukkitTask bukkitTask() {
+        return bukkitTask;
+    }
+
+    @ApiStatus.Internal
+    public @Nullable ScheduledTask foliaTask() {
+        return scheduledTask;
     }
 
     public void cancel() {
@@ -48,8 +60,8 @@ public final class Task {
         }
     }
 
-    private static Task runBukkit(Runnable runnable, long delay) {
-        return new Task(Bukkit.getScheduler().runTaskLater(plugin(), runnable, delay));
+    private static BukkitTask runBukkit(Runnable runnable, long delay) {
+        return Bukkit.getScheduler().runTaskLater(plugin(), runnable, delay);
     }
 
     public static void ensureSync(Runnable runnable) {
@@ -70,64 +82,73 @@ public final class Task {
         else Bukkit.getAsyncScheduler().runNow(plugin(), _ -> runnable.run());
     }
 
-    public static Task runGlobally(Runnable runnable, long delay) {
-        return runningFolia
-                ? new Task(server().getGlobalRegionScheduler().runDelayed(plugin(), (_) -> runnable.run(), delay))
-                : runBukkit(runnable, delay);
+    private static Task create(Supplier<BukkitTask> bukkit, Supplier<@Nullable ScheduledTask> folia) {
+        return runningFolia ? new Task(folia.get()) : new Task(bukkit.get());
     }
 
-    public static Task runLocation(Location location, Runnable runnable, long wait) {
-        return runningFolia
-                ? new Task(server().getRegionScheduler().runDelayed(plugin(), location, (_) -> runnable.run(), wait))
-                : runBukkit(runnable, wait);
+    private static long fixupDelay(long delay) {
+        if(runningFolia && delay < 1L) return 1L;
+        return delay;
+    }
+
+    public static Task runGlobally(Runnable runnable, long delay) {
+        return create(
+                () -> runBukkit(runnable, delay),
+                () -> server().getGlobalRegionScheduler().runDelayed(plugin(), (_) -> runnable.run(), fixupDelay(delay))
+        );
+    }
+
+    public static Task runLocation(Location location, Runnable runnable, long delay) {
+        return create(
+                () -> runBukkit(runnable, delay),
+                () -> server().getRegionScheduler().runDelayed(plugin(), location, (_) -> runnable.run(), fixupDelay(delay))
+        );
     }
 
     public static Task runEntity(Entity entity, Runnable runnable, long delay) {
-        if(runningFolia) {
-            ScheduledTask scheduledTask = entity.getScheduler().runDelayed(plugin(), (_) -> runnable.run(), null, delay);
-            assert scheduledTask != null;
-            return new Task(scheduledTask);
-        }
-
-        return runBukkit(runnable, delay);
+        return create(
+                () -> runBukkit(runnable, delay),
+                () -> entity.getScheduler().runDelayed(plugin(), (_) -> runnable.run(), null, fixupDelay(delay))
+        );
     }
 
     public static Task async(Runnable runnable, long delay) {
-        return runningFolia
-                ? new Task(server().getAsyncScheduler().runDelayed(plugin(), (_) -> runnable.run(), delay * 50L, TimeUnit.MILLISECONDS))
-                : new Task(Bukkit.getScheduler().runTaskLaterAsynchronously(plugin(), runnable, delay));
+        return create(
+                () -> Bukkit.getScheduler().runTaskLaterAsynchronously(plugin(), runnable, delay),
+                () -> server().getAsyncScheduler().runDelayed(plugin(), (_) -> runnable.run(), fixupDelay(delay) * 50L, TimeUnit.MILLISECONDS)
+        );
     }
 
-    private static Task runTaskTimerBukkit(Runnable runnable, long delay, long period) {
-        return new Task(Bukkit.getScheduler().runTaskTimer(plugin(),  runnable, delay, period));
+    private static BukkitTask runTaskTimerBukkit(Runnable runnable, long delay, long period) {
+        return Bukkit.getScheduler().runTaskTimer(plugin(),  runnable, delay, period);
     }
 
     public static Task runTaskTimerGlobally(Runnable runnable, long delay, long period) {
-        return runningFolia
-                ? new Task(server().getGlobalRegionScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), delay, period))
-                : runTaskTimerBukkit(runnable, delay, period);
+        return create(
+                () -> runTaskTimerBukkit(runnable, delay, period),
+                () -> server().getGlobalRegionScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), fixupDelay(delay), period)
+        );
     }
 
     public static Task runTaskTimerLocation(Location location, Runnable runnable, long delay, long period) {
-        return runningFolia
-                ? new Task(server().getRegionScheduler().runAtFixedRate(plugin(), location, (_) -> runnable.run(), delay, period))
-                : runTaskTimerBukkit(runnable, delay, period);
+        return create(
+                () -> runTaskTimerBukkit(runnable, delay, period),
+                () -> server().getRegionScheduler().runAtFixedRate(plugin(), location, (_) -> runnable.run(), fixupDelay(delay), period)
+        );
     }
 
     public static Task runTaskTimerEntity(Entity entity, Runnable runnable, long delay, long period) {
-        if(runningFolia) {
-            ScheduledTask scheduledTask = entity.getScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), null, delay, period);
-            assert scheduledTask != null;
-            return new Task(scheduledTask);
-        }
-
-        return runTaskTimerBukkit(runnable, delay, period);
+        return create(
+                () -> runTaskTimerBukkit(runnable, delay, period),
+                () -> entity.getScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), null, fixupDelay(delay), period)
+        );
     }
 
     public static Task runTaskTimerAsync(Runnable runnable, long delay, long period) {
-        return runningFolia
-                ? new Task(server().getAsyncScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), delay * 50L, period * 50L, TimeUnit.MILLISECONDS))
-                : new Task(Bukkit.getScheduler().runTaskTimerAsynchronously(plugin(), runnable, delay, period));
+        return create(
+                () -> Bukkit.getScheduler().runTaskTimerAsynchronously(plugin(), runnable, delay, period),
+                () -> server().getAsyncScheduler().runAtFixedRate(plugin(), (_) -> runnable.run(), fixupDelay(delay) * 50L, period * 50L, TimeUnit.MILLISECONDS)
+        );
     }
 
     private static Server server() {

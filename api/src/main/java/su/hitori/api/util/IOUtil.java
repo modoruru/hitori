@@ -19,8 +19,6 @@ public final class IOUtil {
      */
     public static byte[] readInputStream(InputStream is) throws IOException {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            if(is == null) throw new RuntimeException();
-
             int read;
             byte[] buffer = new byte[1024];
             while ((read = is.read(buffer, 0, buffer.length)) != -1) {

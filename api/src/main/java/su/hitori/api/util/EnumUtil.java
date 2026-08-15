@@ -2,6 +2,7 @@ package su.hitori.api.util;
 
 import org.jetbrains.annotations.Nullable;
 
+@Deprecated(forRemoval = true)
 public final class EnumUtil {
 
     private EnumUtil() {}

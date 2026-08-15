@@ -1,6 +1,5 @@
 package su.hitori.api.util;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
@@ -93,7 +92,7 @@ public final class Either<A, B> {
      * @param <A> first (A) object type
      * @param <B> second (B) object type
      */
-    public static <A, B> Either<A, B> ofFirst(@NotNull A first) {
+    public static <A, B> Either<A, B> ofFirst(A first) {
         return new Either<>(first, null);
     }
 
@@ -104,7 +103,7 @@ public final class Either<A, B> {
      * @param <A> first (A) object type
      * @param <B> second (B) object type
      */
-    public static <A, B> Either<A, B> ofSecond(@NotNull B second) {
+    public static <A, B> Either<A, B> ofSecond(B second) {
         return new Either<>(null, second);
     }
 
