@@ -17,9 +17,10 @@ public interface Serializer {
      * Serializes configuration data
      * @param rootSchemeNode root configuration node
      * @param rawData "absolutePath to value" map containing all configuration data
+     * @param comments "absolutePath to comment" map containing comments for specific fields
      * @param output where to write serialized data
      */
-    void write(SectionScheme.Node rootSchemeNode, Map<String, Object> rawData, OutputStream output);
+    void write(SectionScheme.Node rootSchemeNode, Map<String, Object> rawData, Map<String, String> comments, OutputStream output);
 
     /**
      * Deserializes configuration data

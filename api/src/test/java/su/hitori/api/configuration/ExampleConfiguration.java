@@ -13,6 +13,9 @@ public final class ExampleConfiguration extends SectionScheme {
     ), String.class);
     public final Field<ExampleEnum> coolValue = Field.create(ExampleConfiguration.ExampleEnum.SECOND_COOL_VALUE);
 
+    @Comment("Example comment for field field_with_comment")
+    public final Field<String> fieldWithComment = Field.create("Field with comment");
+
     public static final class Messages extends SectionScheme {
         public final Field<String> join = Field.create("%s joined");
         public final Field<String> quit = Field.create("%s quit");

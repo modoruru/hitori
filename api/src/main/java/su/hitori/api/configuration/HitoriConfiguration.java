@@ -35,6 +35,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
     private final Key key;
     private final RootScheme rootSectionScheme;
     private final @Nullable ConfigurationSource configurationSource;
+    private final Map<String, String> comments;
 
     private final Executor executor;
     private final Context context;
@@ -43,11 +44,12 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
         this.key = key;
         this.rootSectionScheme = rootSectionScheme;
         this.configurationSource = configurationSource;
+        this.comments = new HashMap<>();
 
         this.executor = Executors.newCachedThreadPool();
         this.context = new Context(this);
 
-        rootSectionScheme.root = SectionScheme.compileSectionNode(context, "", rootSectionScheme.getClass(), rootSectionScheme);
+        rootSectionScheme.root = SectionScheme.compileSectionNode(context, "", rootSectionScheme.getClass(), rootSectionScheme, comments);
 
         if(configurationSource != null) readFromSource(configurationSource, true);
     }
@@ -205,7 +207,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
         if(context.rawData == null) throw notLoaded();
 
         synchronized (context.lock) {
-            serializer.write(rootSectionScheme.root, context.rawData, output);
+            serializer.write(rootSectionScheme.root, context.rawData, comments, output);
         }
     }
 
@@ -221,7 +223,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
         synchronized (context.lock) {
             Map<String, Object> copy = new HashMap<>(context.rawData);
-            executor.execute(() -> serializer.write(rootSectionScheme.root, copy, output));
+            executor.execute(() -> serializer.write(rootSectionScheme.root, copy, comments, output));
         }
     }
 

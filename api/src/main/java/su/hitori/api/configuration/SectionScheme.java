@@ -84,10 +84,11 @@ public abstract class SectionScheme {
      * @param absolutePath absolute path of the node to compile
      * @param schemeClass class of the scheme
      * @param scheme scheme instance
+     * @param comments map to output read comments
      * @return compiled node
      */
     @SuppressWarnings("DataFlowIssue")
-    static Node compileSectionNode(HitoriConfiguration.Context context, String absolutePath, Class<? extends SectionScheme> schemeClass, SectionScheme scheme) {
+    static Node compileSectionNode(HitoriConfiguration.Context context, String absolutePath, Class<? extends SectionScheme> schemeClass, SectionScheme scheme, Map<String, String> comments) {
         String pathPrefix;
         if(absolutePath.isEmpty()) pathPrefix = absolutePath;
         else pathPrefix = absolutePath + '.';
@@ -108,16 +109,17 @@ public abstract class SectionScheme {
             }
 
             String internalFieldName = internalField.getName();
+            String fieldPath = pathPrefix + internalFieldName;
 
             Node node;
             if(SectionScheme.class.isAssignableFrom(internalFieldType)) {
                 SectionScheme asSectionScheme = UnsafeUtil.cast(internalFieldValue);
-                node = asSectionScheme.root = compileSectionNode(context, pathPrefix + internalFieldName, UnsafeUtil.cast(internalFieldType), asSectionScheme);
+                node = asSectionScheme.root = compileSectionNode(context, fieldPath, UnsafeUtil.cast(internalFieldType), asSectionScheme, comments);
             }
             else if(!internalFieldType.isAssignableFrom(Field.class)) continue;
             else {
                 Field<?> field = UnsafeUtil.cast(internalFieldValue);
-                field.assignContextAndInfo(context, new Field.Info(internalFieldName, pathPrefix + internalFieldName));
+                field.assignContextAndInfo(context, new Field.Info(internalFieldName, fieldPath));
 
                 node = new Node(
                         field.type.isAssignableFrom(List.class)
@@ -127,6 +129,9 @@ public abstract class SectionScheme {
                         null
                 );
             }
+
+            Comment commentAnnotation = internalField.getAnnotation(Comment.class);
+            if(commentAnnotation != null) comments.put(fieldPath, commentAnnotation.value());
 
             results.put(internalFieldName, node);
         }
