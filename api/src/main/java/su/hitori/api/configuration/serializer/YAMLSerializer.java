@@ -2,6 +2,13 @@ package su.hitori.api.configuration.serializer;
 
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.comments.CommentLine;
+import org.yaml.snakeyaml.comments.CommentType;
+import org.yaml.snakeyaml.nodes.MappingNode;
+import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.NodeTuple;
+import org.yaml.snakeyaml.nodes.ScalarNode;
+import org.yaml.snakeyaml.nodes.SequenceNode;
 import su.hitori.api.configuration.Field;
 import su.hitori.api.configuration.SectionScheme;
 import su.hitori.api.util.NameFormatter;
@@ -29,23 +36,82 @@ public final class YAMLSerializer implements Serializer {
         DumperOptions dumperOptions = new DumperOptions();
         dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
         dumperOptions.setPrettyFlow(true);
+        dumperOptions.setProcessComments(true);
+
         this.yaml = new Yaml(dumperOptions);
     }
 
     @Override
-    public void write(SectionScheme.Node rootSchemeNode, Map<String, Object> rawData, OutputStream output) {
+    public void write(SectionScheme.Node rootSchemeNode, Map<String, Object> rawData, Map<String, String> comments, OutputStream output) {
         // build map for proper saving
         Map<String, Object> map = new HashMap<>();
 
         assert rootSchemeNode.section() != null;
         writeSection("", rootSchemeNode, rawData, map);
 
+        Node rootNode = yaml.represent(map);
+        attachComments(rootNode, comments);
+
         try (OutputStreamWriter writer = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
-            yaml.dump(map, writer);
+            yaml.serialize(rootNode, writer);
         }
         catch (IOException exception) {
             throw new IllegalArgumentException(exception);
         }
+    }
+
+    private static void attachComments(Node node, Map<String, String> comments) {
+        attachComments(node, "", comments);
+    }
+
+    private static void attachComments(Node node, String absolutePath, Map<String, String> comments) {
+        if (!(node instanceof MappingNode mappingNode)) return;
+
+        if(absolutePath.isEmpty() && comments.get("") != null) {
+            mappingNode.setBlockComments(List.of(
+                    new CommentLine(
+                            null,
+                            null,
+                            " " + comments.get(""),
+                            CommentType.BLOCK
+                    )
+            ));
+        }
+
+        for (NodeTuple tuple : mappingNode.getValue()) {
+            Node keyNode = tuple.getKeyNode();
+            Node valueNode = tuple.getValueNode();
+
+            if (!(keyNode instanceof ScalarNode scalarKeyNode)) continue;
+
+            String snakeCaseName = scalarKeyNode.getValue();
+            String convertedName = NameFormatter.fromAnyCase(snakeCaseName).toCamel();
+
+            String path = absolutePath.isEmpty()
+                    ? convertedName
+                    : absolutePath + '.' + convertedName;
+
+            String comment = comments.get(path);
+
+            if (comment != null && !comment.isBlank()) {
+                keyNode.setBlockComments(List.of(
+                        new CommentLine(
+                                null,
+                                null,
+                                " " + comment,
+                                CommentType.BLOCK
+                        )
+                ));
+            }
+
+            if (valueNode instanceof MappingNode) attachComments(valueNode, path, comments);
+            else if (valueNode instanceof SequenceNode sequenceNode)
+                attachSequenceComments(sequenceNode, path, comments);
+        }
+    }
+
+    // Lists of nodes (unsupported at a time)
+    private static void attachSequenceComments(SequenceNode sequenceNode, String absolutePath, Map<String, String> comments) {
     }
 
     private static void writeSection(String absolutePath, SectionScheme.Node node, Map<String, Object> rawData, Map<String, Object> results) {

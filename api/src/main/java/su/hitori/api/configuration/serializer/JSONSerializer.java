@@ -24,7 +24,7 @@ public final class JSONSerializer implements Serializer {
     private JSONSerializer() {}
 
     @Override
-    public void write(SectionScheme.Node rootSchemeNode, Map<String, Object> rawData, OutputStream output) {
+    public void write(SectionScheme.Node rootSchemeNode, Map<String, Object> rawData, Map<String, String> comments, OutputStream output) {
         JSONObject body = new JSONObject();
 
         assert rootSchemeNode.section() != null;
@@ -38,7 +38,7 @@ public final class JSONSerializer implements Serializer {
         }
     }
 
-    private static void writeSection(String absolutePath, SectionScheme.Node node, Map<String, Object> rawData, JSONObject body) {
+    private static void writeSection(String absolutePath, SectionScheme.Node node, Map<String, Object> rawData,  JSONObject body) {
         String pathPrefix;
         if(absolutePath.isEmpty()) pathPrefix = absolutePath;
         else pathPrefix = absolutePath + '.';
