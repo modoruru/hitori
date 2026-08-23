@@ -67,6 +67,17 @@ public final class YAMLSerializer implements Serializer {
     private static void attachComments(Node node, String absolutePath, Map<String, String> comments) {
         if (!(node instanceof MappingNode mappingNode)) return;
 
+        if(absolutePath.isEmpty() && comments.get("") != null) {
+            mappingNode.setBlockComments(List.of(
+                    new CommentLine(
+                            null,
+                            null,
+                            " " + comments.get(""),
+                            CommentType.BLOCK
+                    )
+            ));
+        }
+
         for (NodeTuple tuple : mappingNode.getValue()) {
             Node keyNode = tuple.getKeyNode();
             Node valueNode = tuple.getValueNode();
@@ -83,11 +94,11 @@ public final class YAMLSerializer implements Serializer {
             String comment = comments.get(path);
 
             if (comment != null && !comment.isBlank()) {
-                valueNode.setBlockComments(List.of(
+                keyNode.setBlockComments(List.of(
                         new CommentLine(
                                 null,
                                 null,
-                                comment,
+                                " " + comment,
                                 CommentType.BLOCK
                         )
                 ));

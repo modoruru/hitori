@@ -93,6 +93,9 @@ public abstract class SectionScheme {
         if(absolutePath.isEmpty()) pathPrefix = absolutePath;
         else pathPrefix = absolutePath + '.';
 
+        Comment schemeCommentAnnotation = schemeClass.getAnnotation(Comment.class);
+        if(schemeCommentAnnotation != null) comments.put(absolutePath, schemeCommentAnnotation.value());
+
         Map<String, Node> results = new HashMap<>();
 
         for (java.lang.reflect.Field internalField : schemeClass.getDeclaredFields()) {

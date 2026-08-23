@@ -2,6 +2,7 @@ package su.hitori.api.configuration;
 
 import java.util.List;
 
+@Comment("Comment on the root node")
 public final class ExampleConfiguration extends SectionScheme {
 
     public final Field<String> string = Field.create("string");
