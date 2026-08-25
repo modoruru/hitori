@@ -1,7 +1,5 @@
 package su.hitori.plugin.module;
 
-import com.mojang.brigadier.tree.LiteralCommandNode;
-import dev.jorel.commandapi.CommandAPICommand;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
 import org.bukkit.Bukkit;
@@ -27,13 +25,11 @@ import su.hitori.plugin.module.enable.ListenersRegistrarImpl;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 /*
 Work pipeline explanation
@@ -178,14 +174,6 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             }
 
             assert corePlugin != null;
-            if(!corePlugin.serverCoreInfo().isFolia()) {
-                Task.runGlobally(() -> {
-                    for (CommandAPICommand command : commandsRegistrar.oldCommands) {
-                        command.register(corePlugin);
-                    }
-                }, 1L);
-            }
-
             commandsModificationInfo = corePlugin.commandRegistryModifier().applyModificationsInBatch(
                     commandsRegistrar.commands,
                     Set.of()
@@ -234,34 +222,13 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             HandlerList.unregisterAll(listener);
         }
 
-        // Unregister command aliases
-        if(!corePlugin.serverCoreInfo().isFolia()) {
-            Set<String> toUnregister = new HashSet<>();
-            for (CommandAPICommand command : commandsRegistrar.oldCommands) {
-                toUnregister.add(command.getName());
-                toUnregister.addAll(Arrays.asList(command.getAliases()));
-            }
-
-            Task.ensureSync(() -> {
-                try {
-                    Method method = Class.forName("dev.jorel.commandapi.CommandAPI").getDeclaredMethod("unregister", String.class, boolean.class);
-                    for (String command : toUnregister) {
-                        method.invoke(null, command, true);
-                    }
-                }
-                catch (Exception _) {
-                    // ignore stacktrace
-                }
-            });
-        }
-
         if(commandsModificationInfo != null) {
             corePlugin.commandRegistryModifier().undoBatch(commandsModificationInfo);
             commandsModificationInfo = null;
         }
 
         listenersRegistrar.listeners.clear();
-        commandsRegistrar.oldCommands.clear();
+        commandsRegistrar.commands.clear();
     }
 
     @Override

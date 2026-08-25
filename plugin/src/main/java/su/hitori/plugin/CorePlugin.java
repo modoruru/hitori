@@ -12,7 +12,6 @@ import su.hitori.api.Hitori;
 import su.hitori.api.HitoriHolder;
 import su.hitori.api.HitoriRegistryAccess;
 import su.hitori.api.ServerCoreInfo;
-import su.hitori.api.command.CommandsRegistryModifier;
 import su.hitori.api.configuration.ConfigurationSource;
 import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.configuration.serializer.YAMLSerializer;
