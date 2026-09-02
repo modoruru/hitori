@@ -259,7 +259,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             Class<?> mainClass = classLoader.loadClass(extendedMeta.bootstrapClass());
             Constructor<?> constructor = mainClass.getConstructor();
             Object instance = constructor.newInstance();
-            if(!(instance instanceof ModuleBootstrap moduleBootstrap)) throw new IllegalStateException("created instance is not a ModuleBootstrap");
+            if(!(instance instanceof ModuleBootstrap moduleBootstrap)) throw new IllegalStateException("Created instance is not an instance of ModuleBootstrap");
             return Optional.of(moduleBootstrap);
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -275,7 +275,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         Key newKey;
         try {
             meta = ExtendedMeta.readMetaFromJar(jar);
-            newKey = meta.key();
+            newKey = meta.moduleMeta().key();
         }
         catch (Throwable ex) {
             throw new RuntimeException("Error while parsing jar meta ", ex);
