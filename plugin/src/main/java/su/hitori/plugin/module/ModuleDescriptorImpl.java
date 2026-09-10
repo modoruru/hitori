@@ -130,12 +130,13 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         return compatibilitySetUp = true;
     }
-    void enable() {
-        if(!loaded || enabled || enabling) return;
+
+    boolean enable() {
+        if(!loaded || enabled || enabling) return false;
         try {
             assert key != null;
             logger.info("Enabling module \"" + key.asString() + "\"");
-            if(!compatibilitySetUp && !setupCompatibility()) return;
+            if(!compatibilitySetUp && !setupCompatibility()) return false;
             enabling = true;
 
             Set<String> notFound = new HashSet<>();
@@ -148,7 +149,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             if(!notFound.isEmpty()) {
                 logger.warning("Module \"" + key.asString() + "\" requires unknown modules: " + String.join(", ", notFound) + ". Enabling cancelled.");
                 enabling = false;
-                return;
+                return false;
             }
 
             assert listenersRegistrar != null && commandsRegistrar != null && configurationsRegistrar != null;
@@ -165,8 +166,8 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                 logger.severe("Module caused an exception while enabling - disabling it. Exception presented below.");
                 logger.warning(LoggerUtil.exceptionToString(exception));
                 enabling = false;
-                Task.async(this::disable, 0L);
-                return;
+                Task.async(this::disable, 0L); // To consider: Should we even call disable logic if enabling was failed? Some modules wouldn't handle properly such scenarios.
+                return false;
             }
 
             listenersRegistrar.frozen = true;
@@ -202,7 +203,10 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         }
         catch (Throwable exception) {
             logger.warning(LoggerUtil.exceptionToString(exception));
+            return false;
         }
+
+        return true;
     }
 
     void disable() {
@@ -388,7 +392,10 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         // FUCK COMMAND API - POOREST SHIT IN THE WORLD
         if(injected.isEmpty() || !reloadInjected) {
-            if(autoEnable) enable();
+            if(autoEnable && enable()) {
+                callOutcomingHooks(null);
+                callIncomingHooks();
+            }
             return;
         }
 
@@ -397,12 +404,10 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             descriptor.reload(descriptor.getJar(), false, true, injected);
         }
 
-        if(!autoEnable) return;
-
-        enable();
+        if(!autoEnable && !enable()) return;
 
         for (ModuleDescriptorImpl descriptor : injected) {
-            descriptor.enable();
+            if(!descriptor.enable()) return;
         }
 
         assert this.key != null;
