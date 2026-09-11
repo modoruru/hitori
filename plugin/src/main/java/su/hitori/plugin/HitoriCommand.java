@@ -31,7 +31,9 @@ import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Messages;
 import su.hitori.api.util.SafeUtil;
 import su.hitori.api.util.UnsafeUtil;
+import su.hitori.plugin.module.ExtendedMeta;
 import su.hitori.plugin.module.ModuleDescriptorImpl;
+import su.hitori.plugin.module.ModuleRepositoryImpl;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -349,51 +351,74 @@ final class HitoriCommand {
     }
 
     private static int dump(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) {
-        DumpBuilder builder = new DumpBuilder();
+        DumpBuilder builder = new DumpBuilder().indentation(2);
         ModuleRepository moduleRepository = corePlugin.moduleRepository();
         var ciCdInfo = extractCiCdInfo(corePlugin).orElse(Pair.of("ide", "ide"));
 
         // plugin info, server info, hardware info
-        builder.append("- hitori\n");
-        builder.append("  version: ").appendAqua(corePlugin.getPluginMeta().getVersion()).newLine();
-        builder.append("  commit: ").appendAqua(ciCdInfo.first()).newLine();
-        builder.append("  branch: ").appendAqua(ciCdInfo.second()).newLine();
-        builder.append("  modules installed: ").appendAqua(moduleRepository.keySet().size()).newLine();
-        builder.append("  modules:\n");
+        builder.startSection("hitori")
+                .appendParameter("version", corePlugin.getPluginMeta().getVersion(), "aqua")
+                .appendParameter("commit", ciCdInfo.first(), "aqua")
+                .appendParameter("branch", ciCdInfo.second(), "aqua")
+                .appendParameter("modules installed", moduleRepository.keySet().size(), "aqua");
 
-        for (Key key : moduleRepository.keySet()) {
-            builder.append("  - ").appendYellow(key.asString()).newLine();
+        if(!moduleRepository.keySet().isEmpty()) {
+            builder.startSection("modules");
 
-            var opt = moduleRepository.getModule(key)
-                    .map(ModuleDescriptor::getInstance)
-                    .map(Module::moduleMeta);
-            assert opt.isPresent();
-            ModuleMeta moduleMeta = opt.get();
-            builder.append("    version: ").appendAqua(moduleMeta.version().toString()).newLine();
-            builder.append("    description: \"").appendYellow(moduleMeta.description()).append("\"\n");
+            for (Key key : moduleRepository.keySet()) {
+                builder.startSection(key.asString());
+
+                var opt = moduleRepository.getModule(key)
+                        .map(ModuleDescriptor::getInstance)
+                        .map(Module::moduleMeta);
+                assert opt.isPresent();
+                ModuleMeta moduleMeta = opt.get();
+
+                builder.appendParameter("version", moduleMeta.version().toString(), "aqua");
+                if(moduleMeta.buildInfo() != null) {
+                    ModuleMeta.BuildInfo buildInfo = moduleMeta.buildInfo();
+
+                    builder.startSection("build info")
+                            .appendParameter("an IDE build", buildInfo.ide() ? "yes" : "no", buildInfo.ide() ? "red" : "green")
+                            .appendParameter("commit", buildInfo.commit() == null ? "not provided" : buildInfo.commit(), "aqua")
+                            .dropSection();
+                }
+
+                builder.appendParameter("description", moduleMeta.description(), "yellow")
+                        .dropSection();
+            }
         }
 
-        ServerBuildInfo serverBuildInfo = ServerBuildInfo.buildInfo();
-        builder.append("- server\n");
-        builder.append("  game version: ").appendAqua(serverBuildInfo.minecraftVersionId()).newLine();
-        builder.append("  brand id: ").appendAqua(serverBuildInfo.brandId()).newLine();
-        builder.append("  brand name: \"").appendYellow(serverBuildInfo.brandName()).append("\"\n");
-        builder.append("  - build\n");
-        builder.append("    number: ").appendAqua(
-                Optional.of(serverBuildInfo.buildNumber().orElse(-1))
-                        .filter(value -> value != -1)
-                        .map(String::valueOf)
-                        .orElse("unknown")
-        ).newLine();
-        builder.append("    timestamp: ").appendAqua(DATE_FORMAT.format(serverBuildInfo.buildTime().atZone(ZoneId.of("UTC")))).newLine();
+        builder.dropSection(); // drop hitori section
 
-        builder.append("- system\n");
-        builder.append("  - os\n");
-        builder.append("    name: \"").appendYellow(System.getProperty("os.name")).append("\"\n");
-        builder.append("    version: ").appendAqua(System.getProperty("os.version")).newLine();
-        builder.append("    architecture: ").appendAqua(System.getProperty("os.arch")).newLine();
-        builder.append("  - hardware\n");
-        builder.append("    RAM: ").appendAqua(formatBytes(Runtime.getRuntime().maxMemory()));
+        ServerBuildInfo serverBuildInfo = ServerBuildInfo.buildInfo();
+        builder.startSection("server")
+                .appendParameter("game version", serverBuildInfo.minecraftVersionId(), "aqua")
+                .appendParameter("brand id", serverBuildInfo.brandId(), "aqua")
+                .appendParameter("brand name", serverBuildInfo.brandName(), "yellow")
+                .startSection("build")
+                .appendParameter(
+                        "number",
+                        Optional.of(serverBuildInfo.buildNumber().orElse(-1))
+                                .filter(value -> value != -1)
+                                .map(String::valueOf)
+                                .orElse("unknown"),
+                        "aqua"
+                )
+                .appendParameter("timestamp", DATE_FORMAT.format(serverBuildInfo.buildTime().atZone(ZoneId.of("UTC"))), "aqua")
+                .dropSection()
+                .dropSection();
+
+        builder.startSection("system")
+                .startSection("os")
+                .appendParameter("name", System.getProperty("os.name"), "yellow")
+                .appendParameter("version", System.getProperty("os.version"), "aqua")
+                .appendParameter("architecture", System.getProperty("os.arch"), "aqua")
+                .dropSection()
+                .startSection("hardware")
+                .appendParameter("RAM", formatBytes(Runtime.getRuntime().maxMemory()), "aqua")
+                .dropSection()
+                .dropSection();
 
         context.getSource().getSender().sendMessage(Messages.INFO.create(String.format(
                 "Creating dump...\n%s\n<yellow><click:copy_to_clipboard:'%s'>[click to copy]</yellow>",
@@ -462,8 +487,19 @@ final class HitoriCommand {
         }
         assert impl.getJar() != null;
         Runnable runnable = corePlugin.commandRegistryModifier().scheduleReload();
-        impl.reload(impl.getJar(), true, true, Set.of());
-        runnable.run();
+        try {
+            impl.reload(impl.getJar(), true, true, Set.of());
+        }
+        catch (ExtendedMeta.MetaReadError metaReadError) {
+            String asText = ModuleRepositoryImpl.convertMetaReadError(impl.getJar().getName(), metaReadError);
+            LOGGER.warning(asText);
+            sender.sendMessage(Messages.ERROR.create("Failed to reload: <red>" + asText));
+            return 0;
+        }
+        finally {
+            runnable.run();
+        }
+
         sender.sendMessage(Messages.INFO.create("Module successfully reloaded."));
 
         return 1;

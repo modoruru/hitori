@@ -1,44 +1,64 @@
 package su.hitori.plugin;
 
+import org.jspecify.annotations.Nullable;
+
 final class DumpBuilder {
 
     private final StringBuilder base, styled;
+    private int indentation, sectionDepth;
 
     DumpBuilder() {
         base = new StringBuilder();
         styled = new StringBuilder();
     }
 
-    DumpBuilder append(Object str) {
-        base.append(str);
-        styled.append(str);
+    DumpBuilder indentation(int indentation) {
+        this.indentation = indentation;
         return this;
     }
 
-    DumpBuilder appendAqua(Object str) {
-        return appendColored(str, "aqua");
-    }
-
-    DumpBuilder appendYellow(Object str) {
-        return appendColored(str, "yellow");
-    }
-
-    private DumpBuilder appendColored(Object str, String color) {
-        base.append(str);
-        styled.append("<color:").append(color).append('>').append(str).append("</color>");
+    DumpBuilder startSection(String name) {
+        appendWithIndentation(name).newLine();
+        ++sectionDepth;
         return this;
     }
 
-    // break line
+    DumpBuilder appendParameter(String name, Object value, @Nullable String color) {
+        return appendWithIndentation(name)
+                .appendBaseAndStyled(": ", ": ")
+                .appendBaseAndStyled(value, color == null ? value : String.format("<color:%s>%s</color>", color, value))
+                .newLine();
+    }
+
+
+    DumpBuilder dropSection() {
+        --sectionDepth;
+        return this;
+    }
+
+    private DumpBuilder appendWithIndentation(Object base) {
+        if(indentation > 0 && sectionDepth > 0) {
+            this.base.repeat(' ', indentation * sectionDepth);
+            this.styled.repeat(' ', indentation * sectionDepth);
+        }
+        return appendBaseAndStyled(base, base);
+    }
+
+    private DumpBuilder appendBaseAndStyled(Object base, Object styled) {
+        this.base.append(base);
+        this.styled.append(styled);
+        return this;
+    }
+
     DumpBuilder newLine() {
-        return append('\n');
+        return appendBaseAndStyled('\n', '\n');
     }
 
-    public String baseToString() {
+    String baseToString() {
         return base.toString();
     }
 
-    public String styledToString() {
+    String styledToString() {
         return styled.toString();
     }
 

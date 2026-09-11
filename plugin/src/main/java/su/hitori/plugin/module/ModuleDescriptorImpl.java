@@ -17,6 +17,7 @@ import su.hitori.api.module.enable.EnableContext;
 import su.hitori.api.registry.MappedRegistry;
 import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Task;
+import su.hitori.api.util.UnsafeUtil;
 import su.hitori.plugin.CorePlugin;
 import su.hitori.plugin.module.compatibility.CompatibilityLayerImpl;
 import su.hitori.plugin.module.enable.CommandsRegistrarImpl;
@@ -31,23 +32,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
-/*
-Work pipeline explanation
-
-# Default module load behavior
-1. load
-2. call setupCompatibility
-3. call enable
-4. call enable hooks module have created during setupCompatibility
-5. call third-party hooks which waits that module to enable
-
-# Module reload behavior with injected modules
-1. load
-2. call setupCompatibility
-3. call Module#enable(EnableContext)
-4. load, call setupCompatibility and call enable for every injected modules, and call enable hooks of injected module except originally reloaded module
-5. call third-party hooks for reloaded module
- */
+// god forgive me for this thing
 public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     private static final Logger logger = LoggerFactory.instance().create(ModuleDescriptor.class);
@@ -72,7 +57,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     private boolean enabling;
     private boolean enabled;
     private boolean loaded; // is jar loaded or not
-    boolean enabledOnce;
+    private boolean enabledOnce;
     private boolean compatibilitySetUp;
 
     public ModuleDescriptorImpl(ModuleRepositoryImpl moduleRepository) {
@@ -83,7 +68,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         return classLoader;
     }
 
-    @Nullable ExtendedMeta getExtendedMeta() {
+    @Nullable ExtendedMeta extendedMeta() {
         return extendedMeta;
     }
 
@@ -126,6 +111,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         return compatibilitySetUp = true;
     }
+
     void enable() {
         if(!loaded || enabled || enabling) return;
         try {
@@ -137,12 +123,15 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             Set<String> notFound = new HashSet<>();
             assert compatibilityLayer != null;
             for (Key requiredModule : compatibilityLayer.required) {
-                if(!requiredModule.equals(key) && moduleRepository.getModule(requiredModule).isEmpty())
+                if(!requiredModule.equals(key) && moduleRepository.getModule(requiredModule)
+                        .<ModuleDescriptorImpl>map(UnsafeUtil::cast)
+                        .map(moduleDescriptor -> moduleDescriptor.loaded)
+                        .orElse(false))
                     notFound.add(requiredModule.asString());
             }
 
             if(!notFound.isEmpty()) {
-                logger.warning("Module \"" + key.asString() + "\" requires unknown modules: " + String.join(", ", notFound) + ". Enabling cancelled.");
+                logger.warning("Module \"" + key.asString() + "\" requires unknown or failed to load modules: " + String.join(", ", notFound) + ". Enabling cancelled.");
                 enabling = false;
                 return;
             }
@@ -270,16 +259,9 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         this.corePlugin = corePlugin;
     }
 
-    void initializeJar(File jar) {
-        ExtendedMeta meta;
-        Key newKey;
-        try {
-            meta = ExtendedMeta.readMetaFromJar(jar);
-            newKey = meta.moduleMeta().key();
-        }
-        catch (Throwable ex) {
-            throw new RuntimeException("Error while parsing jar meta ", ex);
-        }
+    void initializeJar(File jar) throws ExtendedMeta.MetaReadError {
+        ExtendedMeta meta = ExtendedMeta.readMetaFromJar(jar);
+        Key newKey = meta.moduleMeta().key();
 
         boolean first = key == null;
 
@@ -323,7 +305,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             bootstrapClassloaderSkip = false;
     }
 
-    public void reload(File jar, boolean autoEnable, boolean reloadInjected, Set<ModuleDescriptorImpl> skipReloadIfInjected) {
+    public void reload(File jar, boolean autoEnable, boolean reloadInjected, Set<ModuleDescriptorImpl> skipReloadIfInjected) throws ExtendedMeta.MetaReadError {
         if(enabled) disable();
 
         logger.info("Loading module from " + jar.getName());
@@ -353,7 +335,6 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
         loaded = true;
 
-        // FUCK COMMAND API - POOREST SHIT IN THE WORLD
         if(injected.isEmpty() || !reloadInjected) {
             if(autoEnable) enable();
             return;

@@ -37,11 +37,13 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         // maybe replace with a faster logic
         Class<?> clazz = null;
         for (ModuleDescriptorImpl descriptor : descriptors) {
-            assert descriptor.getExtendedMeta() != null && descriptor.getClassLoader() != null;
-            if(name.startsWith(descriptor.getExtendedMeta().packageName())) {
-                try {
-                    clazz = descriptor.getClassLoader().loadClass(requestSource, name, resolve);
-                } catch (ClassNotFoundException _) {}
+            assert descriptor.extendedMeta() != null && descriptor.getClassLoader() != null;
+            for (String aPackage : descriptor.extendedMeta().packages()) {
+                if(name.startsWith(aPackage)) {
+                    try {
+                        clazz = descriptor.getClassLoader().loadClass(requestSource, name, resolve);
+                    } catch (ClassNotFoundException _) {}
+                }
             }
         }
         return clazz;
@@ -122,6 +124,10 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
             descriptor = new ModuleDescriptorImpl(this);
             descriptor.initializeJar(moduleJarFile);
         }
+        catch (ExtendedMeta.MetaReadError metaReadError) {
+            logger.warning(convertMetaReadError(moduleJarFile.getName(), metaReadError));
+            return;
+        }
         catch (Throwable exception) {
             logger.warning(LoggerUtil.exceptionToString(exception));
             return;
@@ -130,13 +136,34 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         descriptors.addLast(descriptor.key(), descriptor);
     }
 
+    public static String convertMetaReadError(String jarFileName, ExtendedMeta.MetaReadError metaReadError) {
+        StringBuilder errorBuilder = new StringBuilder("Error while reading metadata of the module ");
+        errorBuilder.append(jarFileName).append(": ");
+
+        switch (metaReadError.type) {
+            case IO -> {
+                assert metaReadError.ioException != null;
+                errorBuilder.append("An IO error occurred: ").append(LoggerUtil.exceptionToString(metaReadError.ioException));
+            }
+            case OLD_FORMAT -> errorBuilder.append("Module uses old format of metadata. See more about migrating your module to 2.0.0 at our wiki: "); // todo: add link
+            case MISSING_FIELD -> errorBuilder.append("Metadata misses field \"").append(metaReadError.missingField).append("\"");
+            case MISSING_MODULE_JSON -> errorBuilder.append("Jar misses hitori.module.json file.");
+        }
+        return errorBuilder.toString();
+    }
+
     public void enableAll() {
         enablePaperAccessHook();
 
         descriptors.forEach(descriptor -> {
             assert descriptor.getJar() != null && corePlugin != null;
             descriptor.corePlugin(corePlugin);
-            descriptor.reload(descriptor.getJar(), false, false, Set.of());
+            try {
+                descriptor.reload(descriptor.getJar(), false, false, Set.of());
+            }
+            catch (ExtendedMeta.MetaReadError metaReadError) {
+                logger.warning(convertMetaReadError(descriptor.getJar().getName(), metaReadError));
+            }
         });
         descriptors.forEach(ModuleDescriptorImpl::setupCompatibility);
 
