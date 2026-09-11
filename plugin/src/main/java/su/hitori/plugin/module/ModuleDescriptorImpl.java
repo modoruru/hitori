@@ -336,7 +336,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         assert corePlugin != null && classLoader != null && key != null;
         moduleInstance = classLoader.create();
         listenersRegistrar = new ListenersRegistrarImpl();
-        commandsRegistrar = new CommandsRegistrarImpl(key, logger, corePlugin.serverCoreInfo());
+        commandsRegistrar = new CommandsRegistrarImpl();
         if(configurationsRegistrar != null) {
             for (Key key : configurationsRegistrar.configurations.keySet()) {
                 ((MappedRegistry<HitoriConfiguration<?>>) configurationsRegistrar.registry).remove(key);
@@ -384,6 +384,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     }
 
     // todo: change how the enable hooks is called as CompletableFuture for finishing is not a very good option here.
+    // comment on todo: we don't have another options
     void callIncomingHooks() {
         assert key != null;
         moduleRepository.callEnableHooks(key);
