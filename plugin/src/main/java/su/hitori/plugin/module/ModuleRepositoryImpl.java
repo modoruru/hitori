@@ -145,7 +145,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
                 assert metaReadError.ioException != null;
                 errorBuilder.append("An IO error occurred: ").append(LoggerUtil.exceptionToString(metaReadError.ioException));
             }
-            case OLD_FORMAT -> errorBuilder.append("Module uses old format of metadata. See more about migrating your module to 2.0.0 at our wiki: "); // todo: add link
+            case OLD_FORMAT -> errorBuilder.append("Module uses old format of metadata. See more about migrating your module to 2.0.0 at our wiki: https://github.com/modoruru/hitori/wiki/Migrating#from-1xx-to-200");
             case MISSING_FIELD -> errorBuilder.append("Metadata misses field \"").append(metaReadError.missingField).append("\"");
             case MISSING_MODULE_JSON -> errorBuilder.append("Jar misses hitori.module.json file.");
         }
