@@ -1,5 +1,6 @@
 package su.hitori.api.configuration;
 
+import net.kyori.adventure.key.Key;
 import org.jspecify.annotations.Nullable;
 import su.hitori.api.configuration.exception.AlreadyRegisteredException;
 import su.hitori.api.configuration.exception.InternalException;
@@ -9,7 +10,9 @@ import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.util.UnsafeUtil;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Holds primitives and lists in the {@link SectionScheme}. <br>
@@ -35,14 +38,55 @@ public final class Field<T> {
     final Class<T> type;
     final @Nullable Class<?> listType;
     final T defaultValue;
+    final Map<Key, RegisteredFieldListener> listeners;
 
     private HitoriConfiguration.@Nullable Context context;
-    private @Nullable Info info;
+    private SectionScheme.@Nullable Node node;
+    private @Nullable String absolutePath;
 
     private Field(Class<T> type, @Nullable Class<?> listType, T defaultValue) {
         this.type = type;
         this.listType = listType;
         this.defaultValue = defaultValue;
+        this.listeners = new HashMap<>();
+    }
+
+    void rebuildAbsolutePath() {
+        assert node != null;
+
+        SectionScheme.SectionNode parentNode = node.parentNode;
+        if(parentNode == null) {
+            absolutePath = node.name;
+            return;
+        }
+
+        List<String> parts = new ArrayList<>();
+        parts.add(node.name);
+        addPart(parts, parentNode.asSection);
+
+        StringBuilder builder = new StringBuilder();
+        for (int i = parts.size() - 1; i >= 0; i--) {
+            builder.append(parts.get(i));
+            if(i > 0) builder.append('.');
+        }
+        currentFullPath = builder.toString();
+    }
+
+    private static void addPart(List<String> parts, SectionScheme.SectionNode sectionNode) {
+        if(sectionNode.section.index >= 0) {
+            parts.add(String.format("[%s]", sectionNode.section.index));
+            SectionScheme.ListNode node = (SectionScheme.ListNode) sectionNode.parentNode;
+            assert node != null && node.field.name != null;
+            parts.add(node.field.name);
+
+            if(node.field.parentNode != null && node.field.parentNode.asSection != null)
+                addPart(parts, node.field.parentNode.asSection);
+            return;
+        }
+
+        if(sectionNode.parentNode != null) {
+            addPart();
+        }
     }
 
     /**
@@ -63,9 +107,10 @@ public final class Field<T> {
         return defaultValue;
     }
 
-    void assignContextAndInfo(HitoriConfiguration.Context context, Info info) {
+    void assignContextAndInfo(HitoriConfiguration.Context context, SectionScheme.Node node) {
         this.context = context;
-        this.info = info;
+        this.node = node;
+        rebuildAbsolutePath();
     }
 
     private void checkType(Object rawValue) {
@@ -92,9 +137,9 @@ public final class Field<T> {
      */
     public T get() {
         checkContext();
-        assert context != null && info != null;
+        assert context != null && parentNode != null;
 
-        Object rawValue = context.get(info);
+        Object rawValue = context.get(this);
         if(rawValue == null) {
             if(List.class == type) {
                 List<?> defaultValues = UnsafeUtil.cast(defaultValue);
@@ -127,24 +172,24 @@ public final class Field<T> {
      */
     public @Nullable T set(@Nullable T value) {
         checkContext();
-        assert context != null && info != null;
+        assert context != null && parentNode != null;
 
-        Object rawCurrentValue = context.get(info);
+        Object rawCurrentValue = context.get(this);
         if(rawCurrentValue == null && value == null) return null;
 
         if(rawCurrentValue != null && value == null) {
             checkType(rawCurrentValue);
 
-            context.set(info, null);
+            context.set(this, null);
             return cast(rawCurrentValue);
         }
 
         if(List.class == type) {
             List<?> cast = UnsafeUtil.cast(value);
             assert cast != null;
-            context.set(info, List.copyOf(cast));
+            context.set(this, List.copyOf(cast));
         }
-        else context.set(info, value);
+        else context.set(this, value);
         return null;
     }
 
@@ -177,10 +222,13 @@ public final class Field<T> {
      */
     public RegisteredFieldListener listen(ModuleDescriptor descriptor, FieldListener<T> listener) {
         checkContext();
-        assert context != null && info != null;
+        assert context != null && parentNode != null;
 
-        RegisteredFieldListener registeredListener = context.addListener(info, descriptor, listener);
-        if(registeredListener == null) throw new AlreadyRegisteredException("Field is already being listened by this module!");
+        RegisteredFieldListener registeredListener = listeners.get(descriptor.key());
+        if(registeredListener != null) throw new AlreadyRegisteredException("Field is already being listened by this module!");
+
+        registeredListener = new RegisteredFieldListener(descriptor, listener, () -> listeners.remove(descriptor.key()));
+        listeners.put(descriptor.key(), registeredListener);
 
         return registeredListener;
     }
@@ -196,21 +244,34 @@ public final class Field<T> {
         assert clazz != null;
 
         if(listElementsType == List.class) throw new IllegalArgumentException("Embedded list are not allowed at the time.");
-        if(SectionScheme.class.isAssignableFrom(listElementsType)) throw new UnsupportedOperationException("Creating lists of sections is not supported yet, sorry for the inconvenience.");
+        if(SectionScheme.class.isAssignableFrom(listElementsType)) {
+            // Verify that elements are of the exact same class
+            for (T section : defaultValue) {
+                if (section.getClass() != listElementsType) throw new IllegalArgumentException(String.format(
+                        "All elements must be of the same class as provided listElementsType. Expected: %s, Actual: %s",
+                        listElementsType.getName(),
+                        section.getClass().getName()
+                ));
+            }
+            return new Field<>(clazz, listElementsType, List.copyOf(defaultValue));
+        }
 
         for (Class<?> primitiveClass : PRIMITIVES_CLASSES) {
             if(primitiveClass.isAssignableFrom(listElementsType))
                 return new Field<>(clazz, listElementsType, defaultValue);
         }
 
-        throw new IllegalStateException("List elements type should be a primitive");
+        throw new IllegalStateException("List elements type should be a primitive or an extension from SectionScheme");
     }
 
     private void checkContext() {
-        if(context == null || info == null || context.rawData == null)
+        if(context == null || parentNode == null || context.rawData == null)
             throw new IllegalStateException("Context is not initialized, or, method is called outside of HitoriConfiguration#access");
     }
 
-    record Info(String name, String absolutePath) {}
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
+    }
 
 }

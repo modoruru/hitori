@@ -1,6 +1,6 @@
 plugins {
     java
-    id("io.papermc.paperweight.userdev") version "2.0.0-beta.17" apply false
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.21" apply false
     id("com.gradleup.shadow") version "9.0.0-beta4"
 }
 
@@ -23,7 +23,7 @@ allprojects {
     plugins.withType<JavaPlugin> {
         extensions.configure<JavaPluginExtension> {
             toolchain {
-                languageVersion.set(JavaLanguageVersion.of((property("java") ?: defaultJavaVersion) as String))
+                languageVersion.set(JavaLanguageVersion.of((findProperty("java") ?: defaultJavaVersion) as String))
             }
         }
     }
@@ -34,6 +34,6 @@ subprojects {
     else apply(plugin = "java")
 
     dependencies {
-        compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+        compileOnly("io.papermc.paper:paper-api:${findProperty("paper_version")}")
     }
 }

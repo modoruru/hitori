@@ -60,7 +60,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
 
         HitoriConfiguration<CoreConfiguration> coreConfiguration = HitoriConfiguration.create(
                 Key.key("hitori", "core"),
-                new CoreConfiguration(),
+                CoreConfiguration.class,
                 ConfigurationSource.file(YAMLSerializer.INSTANCE, getDataPath().resolve("config/config.yml"))
         );
 
