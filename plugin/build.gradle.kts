@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    paperweight.paperDevBundle("${findProperty("paper_version")}")
+    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     implementation(project(":api"))
 }
 

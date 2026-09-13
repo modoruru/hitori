@@ -45,12 +45,11 @@ import java.util.Map;
  *     public class ExampleSection extends SectionScheme {
  *         public final Field<String> exampleStringInSection = Field.create("Example string in the section!");
  *     }
- * }}</pre>
+ * }
  */
 public abstract class SectionScheme {
 
-    @Nullable Node root, parentNode;
-    int index;
+    @Nullable Node root;
 
     public SectionScheme() {
         Class<? extends SectionScheme> schemeClass = getClass();
@@ -79,55 +78,25 @@ public abstract class SectionScheme {
         }
     }
 
-    static <E extends SectionScheme> E createInstance(Class<E> clazz, Map<String, Node> nodeCache) {
-        try {
-            return clazz.getConstructor().newInstance();
-        }
-        catch (Exception exception) {
-            throw new RuntimeException(exception);
-        }
-    }
-
-    void setInTheList(int index, @Nullable Node node) {
-        this.index = index;
-        this.parentNode = node;
-
-        if(root == null || root.section == null) return;
-        updatePath(root.section);
-    }
-
-    private static void updatePath(Map<String, Node> section) {
-        for (Node node : section.values()) {
-            switch (node.nodeType) {
-                case LIST, PRIMITIVE -> {
-                    assert node.field != null;
-                    node.field.rebuildAbsolutePath();
-                }
-                case SECTION -> {
-                    assert node.section != null;
-                    updatePath(node.section);
-                }
-            }
-        }
-    }
-
     /**
      * Collects data of the scheme via {@link java.lang.reflect}.
      * @param context context that will be assigned to the {@link Field}s
+     * @param absolutePath absolute path of the node to compile
      * @param schemeClass class of the scheme
      * @param scheme scheme instance
+     * @param comments map to output read comments
      * @return compiled node
      */
     @SuppressWarnings("DataFlowIssue")
-    static Node compileSectionNode(HitoriConfiguration.Context context, @Nullable Node parentNode, Class<? extends SectionScheme> schemeClass, SectionScheme scheme, Map<String, Node> nodeCache) {
-        Node cachedNode = nodeCache.get(schemeClass.getName());
-        if(cachedNode != null) return cachedNode;
+    static Node compileSectionNode(HitoriConfiguration.Context context, String absolutePath, Class<? extends SectionScheme> schemeClass, SectionScheme scheme, Map<String, String> comments) {
+        String pathPrefix;
+        if(absolutePath.isEmpty()) pathPrefix = absolutePath;
+        else pathPrefix = absolutePath + '.';
 
         Comment schemeCommentAnnotation = schemeClass.getAnnotation(Comment.class);
-        // if(schemeCommentAnnotation != null) comments.put(absolutePath, schemeCommentAnnotation.value());
+        if(schemeCommentAnnotation != null) comments.put(absolutePath, schemeCommentAnnotation.value());
 
         Map<String, Node> results = new HashMap<>();
-        SectionNode resultingNode = new Node(, NodeType.SECTION, parentNode, scheme, null, results);
 
         for (java.lang.reflect.Field internalField : schemeClass.getDeclaredFields()) {
             int modifiers = internalField.getModifiers();
@@ -143,29 +112,34 @@ public abstract class SectionScheme {
             }
 
             String internalFieldName = internalField.getName();
+            String fieldPath = pathPrefix + internalFieldName;
 
             Node node;
             if(SectionScheme.class.isAssignableFrom(internalFieldType)) {
                 SectionScheme asSectionScheme = UnsafeUtil.cast(internalFieldValue);
-                node = asSectionScheme.root = compileSectionNode(context, resultingNode, UnsafeUtil.cast(internalFieldType), asSectionScheme, nodeCache);
+                node = asSectionScheme.root = compileSectionNode(context, fieldPath, UnsafeUtil.cast(internalFieldType), asSectionScheme, comments);
             }
             else if(!internalFieldType.isAssignableFrom(Field.class)) continue;
             else {
                 Field<?> field = UnsafeUtil.cast(internalFieldValue);
-                node = field.listType() == null
-                        ? new ListNode(internalFieldName, NodeType.LIST, resultingNode, UnsafeUtil.cast(field))
-                        : new PrimitiveNode(internalFieldName, NodeType.PRIMITIVE, resultingNode, field);
+                field.assignContextAndInfo(context, new Field.Info(internalFieldName, fieldPath));
 
-                field.assignContextAndInfo(context, node);
+                node = new Node(
+                        field.type.isAssignableFrom(List.class)
+                                ? NodeType.LIST
+                                : NodeType.PRIMITIVE,
+                        field,
+                        null
+                );
             }
 
             Comment commentAnnotation = internalField.getAnnotation(Comment.class);
-            // if(commentAnnotation != null) comments.put(fieldPath, commentAnnotation.value());
+            if(commentAnnotation != null) comments.put(fieldPath, commentAnnotation.value());
 
             results.put(internalFieldName, node);
         }
 
-        return resultingNode;
+        return new Node(NodeType.SECTION, null, results);
     }
 
     /**
@@ -175,47 +149,14 @@ public abstract class SectionScheme {
         PRIMITIVE, LIST, SECTION
     }
 
-    public static abstract sealed class Node permits PrimitiveNode, ListNode, SectionNode {
-        public final String name;
-        public final NodeType nodeType;
+    /**
+     * Node for the {@link SectionScheme}
+     * @param nodeType
+     * @param field field declaring this node, null if {@link Node#nodeType()} is a section.
+     * @param section section declaring this node, null if {@link Node#nodeType()} is not a section.
+     */
+    public record Node(NodeType nodeType, @Nullable Field<?> field, @Nullable Map<String, Node> section) {
 
-        private Node(String name, NodeType nodeType) {
-            this.name = name;
-            this.nodeType = nodeType;
-        }
-    }
-
-    public static final class PrimitiveNode extends Node {
-        public final Field<?> field;
-        public final @Nullable SectionNode parentNode;
-
-        public PrimitiveNode(String name, NodeType nodeType, @Nullable SectionNode parentNode, Field<?> field) {
-            super(name, nodeType);
-            this.parentNode = parentNode;
-            this.field = field;
-        }
-    }
-
-    public static final class ListNode extends Node {
-        public final Field<List<?>> field;
-        public final @Nullable SectionNode parentNode;
-
-        public ListNode(String name, NodeType nodeType, @Nullable SectionNode parentNode, Field<List<?>> field) {
-            super(name, nodeType);
-            this.parentNode = parentNode;
-            this.field = field;
-        }
-    }
-
-    public static final class SectionNode extends Node {
-        public final SectionScheme section;
-        public final Map<String, Node> sectionAsMap;
-
-        public SectionNode(String name, NodeType nodeType, SectionScheme section, Map<String, Node> sectionAsMap) {
-            super(name, nodeType);
-            this.section = section;
-            this.sectionAsMap = sectionAsMap;
-        }
     }
 
 }

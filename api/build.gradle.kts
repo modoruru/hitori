@@ -6,7 +6,7 @@ plugins {
 }
 
 dependencies {
-    paperweight.paperDevBundle("${findProperty("paper_version")}")
+    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     api("org.json:json:${property("json_version")}")
     api("net.elytrium:serializer:${property("serializer_version")}")
 

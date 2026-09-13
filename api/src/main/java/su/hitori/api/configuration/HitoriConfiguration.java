@@ -20,7 +20,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -34,7 +33,6 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
     private static final Logger LOGGER = LoggerFactory.instance().create();
 
     private final Key key;
-    private final Map<String, RootScheme.Node> nodeCache;
     private final RootScheme rootSectionScheme;
     private final @Nullable ConfigurationSource configurationSource;
     private final Map<String, String> comments;
@@ -42,17 +40,16 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
     private final Executor executor;
     private final Context context;
 
-    private HitoriConfiguration(Key key, Class<RootScheme> rootSectionSchemeType, @Nullable ConfigurationSource configurationSource) {
+    private HitoriConfiguration(Key key, RootScheme rootSectionScheme, @Nullable ConfigurationSource configurationSource) {
         this.key = key;
-        this.nodeCache = new ConcurrentHashMap<>();
-        this.rootSectionScheme = RootScheme.createInstance(rootSectionSchemeType, nodeCache);
+        this.rootSectionScheme = rootSectionScheme;
         this.configurationSource = configurationSource;
         this.comments = new HashMap<>();
 
         this.executor = Executors.newCachedThreadPool();
         this.context = new Context(this);
 
-        rootSectionScheme.root = SectionScheme.compileSectionNode(context, null, "", rootSectionSchemeType, rootSectionScheme, comments, nodeCache);
+        rootSectionScheme.root = SectionScheme.compileSectionNode(context, "", rootSectionScheme.getClass(), rootSectionScheme, comments);
 
         if(configurationSource != null) readFromSource(configurationSource, true);
     }
@@ -186,10 +183,18 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
                 return;
             }
 
-            // if(anyListeners()) compareDataAndCallListeners(Map.copyOf(context.rawData), Map.of());
+            if(anyListeners()) compareDataAndCallListeners(Map.copyOf(context.rawData), Map.of());
 
-            context.rawData.clear();
+            cleanupSectionRecursively(context.rawData);
         }
+    }
+
+    private static void cleanupSectionRecursively(Map<String, Object> rawSection) {
+        for (Object value : rawSection.values()) {
+            if(value instanceof Map<?, ?> childMap)
+                cleanupSectionRecursively(UnsafeUtil.cast(childMap));
+        }
+        rawSection.clear();
     }
 
     /**
@@ -202,7 +207,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
         if(context.rawData == null) throw notLoaded();
 
         synchronized (context.lock) {
-            // serializer.write(rootSectionScheme.root, context.rawData, comments, output);
+            serializer.write(rootSectionScheme.root, context.rawData, comments, output);
         }
     }
 
@@ -217,8 +222,8 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
         if(context.rawData == null) throw notLoaded();
 
         synchronized (context.lock) {
-            // Map<String, Object> copy = new HashMap<>(context.rawData);
-            // executor.execute(() -> serializer.write(rootSectionScheme.root, copy, comments, output));
+            Map<String, Object> copy = new HashMap<>(context.rawData);
+            executor.execute(() -> serializer.write(rootSectionScheme.root, copy, comments, output));
         }
     }
 
@@ -251,7 +256,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
      */
     public void read(Serializer serializer, InputStream input) {
         synchronized (context.lock) {
-            /*boolean anyListeners = anyListeners();
+            boolean anyListeners = anyListeners();
             Map<String, Object> originalData = anyListeners ? new HashMap<>() : null;
 
             if(context.rawData != null) {
@@ -263,7 +268,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
             serializer.read(LoggerFactory.instance().create(Serializer.class), rootSectionScheme.root, input, context.rawData);
 
             // last blocking and huge operation
-            if(anyListeners) compareDataAndCallListeners(originalData, Map.copyOf(context.rawData));*/
+            if(anyListeners) compareDataAndCallListeners(originalData, Map.copyOf(context.rawData));
         }
     }
 
@@ -276,28 +281,47 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
     public void unregisterAllFieldListeners(ModuleDescriptor descriptor) {
         if(context.rawData == null) throw notLoaded();
 
-        /*
         for (Map<Key, RegisteredFieldListener> map : context.fieldListeners.values()) {
             map.keySet().removeIf(key -> key.equals(descriptor.key()));
-        }*/
+        }
+    }
+
+    private boolean anyListeners() {
+        return context.fieldListeners.values()
+                .stream()
+                .anyMatch(
+                        map -> map.values()
+                        .stream()
+                        .anyMatch(registeredFieldListener -> registeredFieldListener.registrar().isEnabled())
+                );
+    }
+
+    private boolean anyListeners(String fieldAbsolutePath) {
+        Map<Key, RegisteredFieldListener> map = context.fieldListeners.get(fieldAbsolutePath);
+        if(map == null || map.isEmpty()) return false;
+        return map.values()
+                .stream()
+                .anyMatch(registeredFieldListener -> registeredFieldListener.registrar().isEnabled());
     }
 
     private @Nullable Field<?> resolveField(String absolutePath) {
-        RootScheme.Node node = rootSectionScheme.root;
-        assert node != null && node.section != null;
+        SectionScheme.Node node = rootSectionScheme.root;
+        assert node != null && node.section() != null;
 
         String[] parts = absolutePath.split("\\.");
         for (int i = 0, length = parts.length - 1; i < length; i++) {
-            assert node.section != null;
-            node = node.section.get(parts[i]);
+            assert node.section() != null;
+            node = node.section().get(parts[i]);
         }
 
-        assert node.section != null;
-        return null;
+        assert node.section() != null;
+        return Optional.ofNullable(node.section().get(parts[parts.length - 1]))
+                .map(SectionScheme.Node::field)
+                .orElse(null);
     }
 
     private void compareDataAndCallListeners(Map<String, Object> oldValues, Map<String, Object> newValues) {
-        /*executor.execute(() -> {
+        executor.execute(() -> {
             for (Map.Entry<String, Map<Key, RegisteredFieldListener>> entry : context.fieldListeners.entrySet()) {
                 String fieldAbsolutePath = entry.getKey();
 
@@ -306,7 +330,7 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
                 compareFieldValuesAndCallListeners(fieldAbsolutePath, oldValue, newValue, entry.getValue().values());
             }
-        });*/
+        });
     }
 
     private void compareFieldValuesAndCallListeners(String fieldAbsolutePath, @Nullable Object oldValue, @Nullable Object newValue, Collection<RegisteredFieldListener> listeners) {
@@ -351,13 +375,13 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
     /**
      * Create an instance of the configuration
      * @param key key of the configuration (used in registration, especially in the {@link ConfigurationsRegistrar}
-     * @param rootSectionSchemeType scheme type of the configuration
+     * @param rootSectionScheme scheme of the configuration
      * @param configurationSource configuration source. if not null, {@link HitoriConfiguration#readFromSource(ConfigurationSource, boolean)} with createIfAbsent set to true would be called immediately after the creation
      * @return created configuration instance
      * @param <C> type of the scheme
      */
-    public static <C extends SectionScheme> HitoriConfiguration<C> create(Key key, Class<C> rootSectionSchemeType, @Nullable ConfigurationSource configurationSource) {
-        return new HitoriConfiguration<>(key, rootSectionSchemeType, configurationSource);
+    public static <C extends SectionScheme> HitoriConfiguration<C> create(Key key, C rootSectionScheme, @Nullable ConfigurationSource configurationSource) {
+        return new HitoriConfiguration<>(key, rootSectionScheme, configurationSource);
     }
 
     /**
@@ -367,28 +391,41 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
         private final HitoriConfiguration<?> configuration;
         final Object lock = new Object(); // for safe context changing
-        @Nullable Map<Field<?>, Object> rawData; // currently loaded data; null if no data is loaded
+        final Map<String, Map<Key, RegisteredFieldListener>> fieldListeners = new HashMap<>();
+        @Nullable Map<String, Object> rawData; // currently loaded data; null if no data is loaded
 
         private Context(HitoriConfiguration<?> configuration) {
             this.configuration = configuration;
         }
 
-        @Nullable Object get(Field<?> field) {
+        @Nullable RegisteredFieldListener addListener(Field.Info info, ModuleDescriptor descriptor, FieldListener<?> fieldListener) {
+            Map<Key, RegisteredFieldListener> fieldListeners = this.fieldListeners.computeIfAbsent(info.absolutePath(), _ -> new HashMap<>());
+            RegisteredFieldListener registeredFieldListener = fieldListeners.get(descriptor.key());
+            if(registeredFieldListener == null) return null;
+
+            registeredFieldListener = new RegisteredFieldListener(descriptor, fieldListener, () -> fieldListeners.remove(descriptor.key()));
+            fieldListeners.put(descriptor.key(), registeredFieldListener);
+            return registeredFieldListener;
+        }
+
+        @Nullable Object get(Field.Info info) {
             synchronized (lock) {
                 assert rawData != null;
-                return rawData.get(field);
+                return rawData.get(info.absolutePath());
             }
         }
 
-        void set(Field<?> field, @Nullable Object value) {
+        void set(Field.Info info, @Nullable Object value) {
             synchronized (lock) {
                 assert rawData != null;
-                Object oldValue = value == null
-                        ? rawData.remove(field)
-                        : rawData.put(field, value);
+                String absolutePath = info.absolutePath();
 
-                // if(!configuration.anyListeners(absolutePath)) return;
-                // configuration.compareFieldValuesAndCallListeners(absolutePath, oldValue, value, fieldListeners.get(absolutePath).values());
+                Object oldValue = value == null
+                        ? rawData.remove(absolutePath)
+                        : rawData.put(absolutePath, value);
+
+                if(!configuration.anyListeners(absolutePath)) return;
+                configuration.compareFieldValuesAndCallListeners(absolutePath, oldValue, value, fieldListeners.get(absolutePath).values());
             }
         }
 
