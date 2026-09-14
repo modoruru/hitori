@@ -20,6 +20,8 @@ public final class VersionTest {
         for (String aCase : cases) {
             Assertions.assertEquals(aCase, new Version(aCase).toString());
         }
+
+        Assertions.assertEquals("1.0.0", new Version("1.0").toString());
     }
 
     @Test

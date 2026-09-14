@@ -13,8 +13,9 @@ This is what *hitori* tries to do by providing an API for registering such thing
 
 ## Main features
 - Modules
-- Safe bukkit listeners and commands (via [CommandAPI](https://github.com/CommandAPI/CommandAPI)) registration
+- Safe bukkit listeners and commands registration
 - More convenient logging system for modules
+- Custom configuration API
 - Many utils regarding I/O, tasks scheduling with [Folia](https://github.com/PaperMC/Folia) support, creating YAML configurations, etc.
 
 ## Usage
