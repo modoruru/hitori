@@ -7,6 +7,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.jetbrains.annotations.Nullable;
 import su.hitori.api.HitoriRegistryAccess;
+import su.hitori.api.Version;
 import su.hitori.api.command.CommandsModificationInfo;
 import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.logging.LoggerFactory;
@@ -23,6 +24,8 @@ import su.hitori.plugin.module.compatibility.CompatibilityLayerImpl;
 import su.hitori.plugin.module.enable.CommandsRegistrarImpl;
 import su.hitori.plugin.module.enable.ConfigurationsRegistrarImpl;
 import su.hitori.plugin.module.enable.ListenersRegistrarImpl;
+import su.hitori.plugin.module.exception.DependencyFailError;
+import su.hitori.plugin.module.exception.MetaReadError;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
@@ -120,18 +123,42 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             if(!compatibilitySetUp && !setupCompatibility()) return false;
             enabling = true;
 
-            Set<String> notFound = new HashSet<>();
-            assert compatibilityLayer != null;
-            for (Key requiredModule : compatibilityLayer.required) {
-                if(!requiredModule.equals(key) && moduleRepository.getModule(requiredModule)
+            Set<String> notFound = new HashSet<>(), incompatibleVersionEntry = new HashSet<>();
+            assert compatibilityLayer != null && extendedMeta != null;
+            for (Map.Entry<Key, ExtendedMeta.ModuleDependency> entry : extendedMeta.modulesDependencies().entrySet()) {
+                Key requiredModule = entry.getKey();
+
+                ModuleDescriptorImpl descriptor = moduleRepository.getModule(requiredModule)
                         .<ModuleDescriptorImpl>map(UnsafeUtil::cast)
-                        .map(moduleDescriptor -> moduleDescriptor.loaded)
-                        .orElse(false))
-                    notFound.add(requiredModule.asString());
+                        .orElse(null);
+                if(descriptor == null || !descriptor.loaded) {
+                    if(entry.getValue().type == ExtendedMeta.ModuleDependency.Type.HARD)
+                        notFound.add(key.asString());
+                    continue;
+                }
+
+                assert descriptor.extendedMeta != null;
+                Version presentVersion = descriptor.extendedMeta.moduleMeta().version();
+
+                if(!entry.getValue().compatible(presentVersion))
+                    incompatibleVersionEntry.add(String.format("%s (required: %s, present: %s)", requiredModule.key(), entry.getValue(), presentVersion));
             }
 
-            if(!notFound.isEmpty()) {
-                logger.warning("Module \"" + key.asString() + "\" requires unknown or failed to load modules: " + String.join(", ", notFound) + ". Enabling cancelled.");
+            if(!notFound.isEmpty() || !incompatibleVersionEntry.isEmpty()) {
+                StringBuilder builder = new StringBuilder("Failed to satisfy dependencies of ").append(key.asString()).append(" module (enabling cancelled):");
+                if(!notFound.isEmpty())
+                    builder.append("\nNot found or failed to load modules: ").append(String.join(", ", notFound));
+
+                if(!incompatibleVersionEntry.isEmpty()) {
+                    builder.append("\nIncompatible versions:\n");
+                    Iterator<String> entriesIterator = incompatibleVersionEntry.iterator();
+                    while (entriesIterator.hasNext()) {
+                        builder.append("- ").append(entriesIterator.next());
+                        if(entriesIterator.hasNext()) builder.append('\n');
+                    }
+                }
+
+                logger.warning(builder.toString());
                 enabling = false;
                 return false;
             }
@@ -262,7 +289,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         this.corePlugin = corePlugin;
     }
 
-    void initializeJar(File jar) throws ExtendedMeta.MetaReadError {
+    void initializeJar(File jar) throws MetaReadError {
         ExtendedMeta meta = ExtendedMeta.readMetaFromJar(jar);
         Key newKey = meta.moduleMeta().key();
 
@@ -308,7 +335,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             bootstrapClassloaderSkip = false;
     }
 
-    public void reload(File jar, boolean autoEnable, boolean reloadInjected, Set<ModuleDescriptorImpl> skipReloadIfInjected) throws ExtendedMeta.MetaReadError {
+    public void reload(File jar, boolean autoEnable, boolean reloadInjected, Set<ModuleDescriptorImpl> skipReloadIfInjected) throws MetaReadError, DependencyFailError {
         if(enabled) disable();
 
         logger.info("Loading module from " + jar.getName());
@@ -316,9 +343,26 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         if(!bootstrapClassloaderSkip)
             initializeJar(jar);
 
+        assert corePlugin != null && extendedMeta != null && key != null;
+        if(!extendedMeta.hitoriDependency().compatible(corePlugin.version()))
+            throw new DependencyFailError(String.format(
+                    "%s requires hitori version %s, but version %s is installed.",
+                    key.asString(),
+                    extendedMeta.hitoriDependency(),
+                    corePlugin.version()
+            ));
+
+        if(!extendedMeta.javaDependency().compatible(corePlugin.javaVersionFeature()))
+            throw new DependencyFailError(String.format(
+                    "%s requires java version %s, but version %s is installed.",
+                    key.asString(),
+                    extendedMeta.javaDependency(),
+                    corePlugin.javaVersionFeature()
+            ));
+
         injected.removeAll(skipReloadIfInjected);
 
-        assert corePlugin != null && classLoader != null && key != null;
+        assert classLoader != null;
         moduleInstance = classLoader.create();
         listenersRegistrar = new ListenersRegistrarImpl();
         commandsRegistrar = new CommandsRegistrarImpl();

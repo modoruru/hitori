@@ -15,7 +15,9 @@ public interface CompatibilityLayer {
      * Marks module as required
      * If it doesn't exist, module will not be loaded
      * @return that CompatibilityLayer
+     * @deprecated Method now does nothing, see <a href="https://github.com/modoruru/hitori/wiki/Migrating#from-1xx-to-200">Migrating from 1.x.x to 2.0.0</a>
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     CompatibilityLayer require(Key key);
 
     /**

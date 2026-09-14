@@ -31,9 +31,10 @@ import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Messages;
 import su.hitori.api.util.SafeUtil;
 import su.hitori.api.util.UnsafeUtil;
-import su.hitori.plugin.module.ExtendedMeta;
 import su.hitori.plugin.module.ModuleDescriptorImpl;
 import su.hitori.plugin.module.ModuleRepositoryImpl;
+import su.hitori.plugin.module.exception.DependencyFailError;
+import su.hitori.plugin.module.exception.MetaReadError;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -490,10 +491,15 @@ final class HitoriCommand {
         try {
             impl.reload(impl.getJar(), true, true, Set.of());
         }
-        catch (ExtendedMeta.MetaReadError metaReadError) {
+        catch (MetaReadError metaReadError) {
             String asText = ModuleRepositoryImpl.convertMetaReadError(impl.getJar().getName(), metaReadError);
             LOGGER.warning(asText);
             sender.sendMessage(Messages.ERROR.create("Failed to reload: <red>" + asText));
+            return 0;
+        }
+        catch (DependencyFailError dependencyFailError) {
+            LOGGER.warning(dependencyFailError.error);
+            sender.sendMessage(Messages.ERROR.create("Failed to reload: <red>" + dependencyFailError.error));
             return 0;
         }
         finally {

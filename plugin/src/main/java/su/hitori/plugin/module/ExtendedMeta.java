@@ -9,6 +9,7 @@ import su.hitori.api.Version;
 import su.hitori.api.module.ModuleMeta;
 import su.hitori.api.util.JSONUtil;
 import su.hitori.api.util.SafeUtil;
+import su.hitori.plugin.module.exception.MetaReadError;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -17,7 +18,7 @@ import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Set<String> packages, ModuleMeta moduleMeta, Dependency<Integer> javaDependency, Dependency<Version> hitoriDependency, Map<Key, Dependency<Version>> modulesDependencies) {
+public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Set<String> packages, ModuleMeta moduleMeta, Dependency<Integer> javaDependency, Dependency<Version> hitoriDependency, Map<Key, ModuleDependency> modulesDependencies) {
 
     private static <E> E wrapRequiredGet(String nodeName, Function<String, E> getFunction) throws MetaReadError {
         try {
@@ -33,8 +34,9 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
         if(operator == null) throw MetaReadError.format("Unable to read operator for \"" + dependencyName + "\" dependency.");
         E dependencyBase = baseParseFunction.apply(dependency.substring(operator.symbols));
         if(dependencyBase == null) throw MetaReadError.format(String.format(
-                "Unable to read java version dependency: \"%s\" version should be represented as %s.",
+                "Unable to read %s dependency version: \"%s\" version should be represented as %s.",
                 dependencyName,
+                dependency,
                 representationTip
         ));
 
@@ -43,6 +45,28 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
 
     private static @Nullable Version parseVersion(String raw) {
         return SafeUtil.wrapParse(Version::new, raw);
+    }
+
+    private static ModuleDependency parseModuleDependency(String module, JSONObject object) throws MetaReadError {
+        String dependency = object.optString("version", null);
+        String rawType = object.optString("type", null);
+        if(dependency == null || rawType == null)
+            throw MetaReadError.format("Version and/or type strings are missing for the " + module + " module dependency.");
+
+        ModuleDependency.Type type = SafeUtil.enumValueOf(ModuleDependency.Type.class, rawType.toUpperCase());
+        if(type == null)
+            throw MetaReadError.format("Unknown dependency type for the " + module + " module dependency.");
+
+        Dependency.Operator operator = Dependency.readOperator(dependency);
+        if(operator == null) throw MetaReadError.format("Unable to read operator for \"" + module + "\" dependency.");
+        Version dependencyBase = parseVersion(dependency.substring(operator.symbols));
+        if(dependencyBase == null) throw MetaReadError.format(String.format(
+                "Unable to read module %s dependency version: \"%s\" version should be represented as SemVer 2.0.0 string",
+                module,
+                dependency
+        ));
+
+        return new ModuleDependency(dependencyBase, operator, type);
     }
 
     @SuppressWarnings("PatternValidation")
@@ -83,19 +107,18 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
                 Dependency<Integer> javaDependency = parseDependency("java", dependsJava, "single integer", SafeUtil::parseInt);
                 Dependency<Version> hitoriDependency = parseDependency("hitori", dependsHitori, "SemVer 2.0.0 string", ExtendedMeta::parseVersion);
 
-                Map<Key, Dependency<Version>> modulesDependencies = new HashMap<>();
+                Map<Key, ModuleDependency> modulesDependencies = new HashMap<>();
                 for (String dependencyKey : depends.keySet()) {
                     if(dependencyKey.equalsIgnoreCase("hitori") || dependencyKey.equalsIgnoreCase("java")) continue;
                     if(dependencyKey.indexOf(':') == -1) throw MetaReadError.format("Unknown dependency type: " + dependencyKey + "\". Allowed types are: java, hitori and module key (for example, hitori:template)");
 
-                    String value = depends.optString(dependencyKey, null);
-                    if(value == null) throw MetaReadError.format(dependencyKey + " value is not a string.");
+                    JSONObject value = depends.optJSONObject(dependencyKey, null);
+                    if(value == null) throw MetaReadError.format(dependencyKey + " value is not a json object.");
 
                     Key moduleKey = SafeUtil.wrapParse(Key::key, dependencyKey);
                     if(moduleKey == null) throw MetaReadError.format("Unable to parse \"" + dependencyKey + "\" key.");
 
-                    Dependency<Version> moduleDependency = parseDependency(dependencyKey, value, "SemVer 2.0.0 string", ExtendedMeta::parseVersion);
-                    modulesDependencies.put(moduleKey, moduleDependency);
+                    modulesDependencies.put(moduleKey, parseModuleDependency(dependencyKey, value));
                 }
 
                 return new ExtendedMeta(
@@ -124,47 +147,22 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
         }
     }
 
-    public static final class MetaReadError extends Exception {
-
-        public static final MetaReadError
-                OLD_FORMAT_ERROR = new MetaReadError(Type.OLD_FORMAT, null, null, null),
-                MISSING_MODULE_JSON = new MetaReadError(Type.MISSING_MODULE_JSON, null, null, null);
+    public static final class ModuleDependency extends Dependency<Version> {
 
         public final Type type;
-        public final @Nullable String missingField;
-        public final @Nullable IOException ioException;
-        public final @Nullable String formatMessage;
 
-        private MetaReadError(Type type, @Nullable String missingField, @Nullable IOException ioException, @Nullable String formatMessage) {
+        public ModuleDependency(Version base, Operator operator, Type type) {
+            super(base, operator);
             this.type = type;
-            this.missingField = missingField;
-            this.ioException = ioException;
-            this.formatMessage = formatMessage;
-        }
-
-        public static MetaReadError missingField(String missingField) {
-            return new MetaReadError(Type.MISSING_FIELD, missingField, null, null);
-        }
-
-        public static MetaReadError io(IOException ioException) {
-            return new MetaReadError(Type.IO, null, ioException, null);
-        }
-
-        public static MetaReadError format(String formatMessage) {
-            return new MetaReadError(Type.FORMAT, null, null, formatMessage);
         }
 
         public enum Type {
-            OLD_FORMAT,
-            MISSING_FIELD,
-            MISSING_MODULE_JSON,
-            IO,
-            FORMAT
+            SOFT, HARD
         }
 
     }
 
-    public static final class Dependency<V extends Comparable<V>> {
+    public static sealed class Dependency<V extends Comparable<V>> permits ModuleDependency {
 
         public final V base;
         public final Operator operator;
@@ -185,7 +183,7 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
         }
 
         public boolean compatible(V other) {
-            int difference = base.compareTo(other);
+            int difference = other.compareTo(base);
             return switch (operator) {
                 case EQUALS -> difference == 0;
                 case GREATER_OR_EQUALS -> difference >= 0;
@@ -206,6 +204,14 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
 
         }
 
+        @Override
+        public String toString() {
+            return switch (operator) {
+                case EQUALS -> "=";
+                case GREATER_OR_EQUALS -> ">=";
+                case GREATER -> ">";
+            } + base;
+        }
     }
 
 }
