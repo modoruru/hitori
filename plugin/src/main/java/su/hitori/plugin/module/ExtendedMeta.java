@@ -80,11 +80,6 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
                     if(aPackage instanceof String packageAsString) convertedPackages.add(packageAsString);
                 }
 
-                Dependency.Operator javaDependencyOperator = Dependency.readOperator(dependsJava);
-                if(javaDependencyOperator == null) throw MetaReadError.format("Unable to read operator for java dependency.");
-                Integer javaDependencyBase = SafeUtil.parseInt(dependsJava.substring(javaDependencyOperator.symbols));
-                if(javaDependencyBase == null) throw MetaReadError.format("Unable to read java version dependency: java version should be represented as single integer.");
-
                 Dependency<Integer> javaDependency = parseDependency("java", dependsJava, "single integer", SafeUtil::parseInt);
                 Dependency<Version> hitoriDependency = parseDependency("hitori", dependsHitori, "SemVer 2.0.0 string", ExtendedMeta::parseVersion);
 
