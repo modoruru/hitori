@@ -12,7 +12,7 @@ import java.util.Set;
  * @param version module version
  * @param description module description or empty string if not present
  */
-public record ModuleMeta(Key key, Version version, @Nullable BuildInfo buildInfo, String description, Set<Key> hardDependencies) {
+public record ModuleMeta(Key key, Version version, @Nullable BuildInfo buildInfo, String description) {
 
     public static final class BuildInfo {
 
