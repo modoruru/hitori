@@ -14,6 +14,9 @@ import su.hitori.plugin.module.dependency.ModuleDependency;
 import su.hitori.plugin.module.exception.MetaReadError;
 
 import java.io.*;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
@@ -98,12 +101,34 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
 
                 // Optional
                 String description = hitoriModuleBody.optString("description");
+                JSONObject authors = hitoriModuleBody.optJSONObject("authors");
+                String website = hitoriModuleBody.optString("website");
                 String bootstrap = hitoriModuleBody.optString("bootstrap", null);
                 JSONObject build = hitoriModuleBody.optJSONObject("build");
 
                 Set<String> convertedPackages = new HashSet<>(packages.length());
                 for (Object aPackage : packages) {
                     if(aPackage instanceof String packageAsString) convertedPackages.add(packageAsString);
+                }
+
+                List<ModuleMeta.Author> convertedAuthors;
+                if(authors == null) convertedAuthors = List.of();
+                else {
+                    convertedAuthors = new ArrayList<>(authors.length());
+                    for (String authorName : authors.keySet()) {
+                        String value = authors.optString(authorName, null);
+                        if(value == null) continue;
+
+                        URL url;
+                        try {
+                            url = URI.create(value).toURL();
+                        }
+                        catch (MalformedURLException | IllegalArgumentException _) {
+                            url = null;
+                        }
+
+                        convertedAuthors.add(new ModuleMeta.Author(authorName, url));
+                    }
                 }
 
                 Dependency<Integer> javaDependency = parseDependency("java", dependsJava, "single integer", SafeUtil::parseInt);
@@ -136,7 +161,9 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
                                             return ModuleMeta.BuildInfo.create(json.getString("commit"));
                                         })
                                         .orElse(null),
-                                description
+                                description,
+                                List.copyOf(convertedAuthors),
+                                SafeUtil.wrapParse(str -> URI.create(str).toURL(), website)
                         ),
                         javaDependency,
                         hitoriDependency,

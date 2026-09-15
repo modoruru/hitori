@@ -23,10 +23,8 @@ import su.hitori.api.configuration.Field;
 import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.configuration.SectionScheme;
 import su.hitori.api.logging.LoggerFactory;
-import su.hitori.api.module.Module;
 import su.hitori.api.module.ModuleDescriptor;
 import su.hitori.api.module.ModuleMeta;
-import su.hitori.api.module.ModuleRepository;
 import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Messages;
 import su.hitori.api.util.SafeUtil;
@@ -38,6 +36,7 @@ import su.hitori.plugin.module.exception.MetaReadError;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -376,14 +375,48 @@ final class HitoriCommand {
                     ModuleMeta.BuildInfo buildInfo = moduleMeta.buildInfo();
 
                     builder.startSection("build info")
-                            .appendParameter("an IDE build", buildInfo.ide() ? "yes" : "no", buildInfo.ide() ? "red" : "green")
+                            .appendParameter("IDE build", buildInfo.ide() ? "yes" : "no", buildInfo.ide() ? "red" : "green")
                             .appendParameter("commit", buildInfo.commit() == null ? "not provided" : buildInfo.commit(), "aqua")
                             .dropSection();
                 }
 
-                builder.appendParameter("description", moduleMeta.description(), "yellow")
-                        .dropSection();
+                builder.appendParameter("description", moduleMeta.description(), "yellow");
+                if(!moduleMeta.authors().isEmpty()) {
+                    StringBuilder base = new StringBuilder(), styled = new StringBuilder();
+                    Iterator<ModuleMeta.Author> authorsIterator = moduleMeta.authors().iterator();
+                    while (authorsIterator.hasNext()) {
+                        ModuleMeta.Author author = authorsIterator.next();
+
+                        styled.append("<color:yellow>");
+                        base.append(author.name);
+
+                        URL url = author.personalWebsite;
+                        if(url != null) {
+                            styled.append("<click:open_url:'").append(url.toString()).append("'>");
+                            base.append(" (").append(url.toString()).append(")");
+                        }
+                        styled.append(author.name);
+
+                        styled.append("</color>");
+
+                        if(authorsIterator.hasNext()) {
+                            base.append(", ");
+                            styled.append(", ");
+                        }
+                    }
+
+                    builder.appendParameterFlat("authors", base, styled);
+                }
+
+                if(moduleMeta.website() != null) {
+                    String websiteAsString = moduleMeta.website().toString();
+                    builder.appendParameterFlat("website", websiteAsString, String.format("<click:open_url:'%s'><aqua><underlined>%s</click>", websiteAsString, websiteAsString));
+                }
+
+                builder.dropSection();
             }
+
+            builder.dropSection();
         }
 
         builder.dropSection(); // drop hitori section

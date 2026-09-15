@@ -4,15 +4,16 @@ import net.kyori.adventure.key.Key;
 import org.jspecify.annotations.Nullable;
 import su.hitori.api.Version;
 
-import java.util.Set;
+import java.net.URL;
+import java.util.List;
 
 /**
- * Metadata of module
+ * Metadata of the module
  * @param key module key
  * @param version module version
  * @param description module description or empty string if not present
  */
-public record ModuleMeta(Key key, Version version, @Nullable BuildInfo buildInfo, String description) {
+public record ModuleMeta(Key key, Version version, @Nullable BuildInfo buildInfo, String description, List<Author> authors, @Nullable URL website) {
 
     public static final class BuildInfo {
 
@@ -40,6 +41,18 @@ public record ModuleMeta(Key key, Version version, @Nullable BuildInfo buildInfo
 
         public static BuildInfo create(String commit) {
             return new BuildInfo(false, commit);
+        }
+
+    }
+
+    public static final class Author {
+
+        public final String name;
+        public final @Nullable URL personalWebsite;
+
+        public Author(String name, @Nullable URL personalWebsite) {
+            this.name = name;
+            this.personalWebsite = personalWebsite;
         }
 
     }

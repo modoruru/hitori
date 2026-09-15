@@ -24,12 +24,15 @@ final class DumpBuilder {
     }
 
     DumpBuilder appendParameter(String name, Object value, @Nullable String color) {
-        return appendWithIndentation(name)
-                .appendBaseAndStyled(": ", ": ")
-                .appendBaseAndStyled(value, color == null ? value : String.format("<color:%s>%s</color>", color, value))
-                .newLine();
+        return appendParameterFlat(name, value, color == null ? value : String.format("<color:%s>%s</color>", color, value));
     }
 
+    DumpBuilder appendParameterFlat(String name, Object valueBase, Object valueStyled) {
+        return appendWithIndentation(name)
+                .appendBaseAndStyled(": ", ": ")
+                .appendBaseAndStyled(valueBase, valueStyled)
+                .newLine();
+    }
 
     DumpBuilder dropSection() {
         --sectionDepth;
