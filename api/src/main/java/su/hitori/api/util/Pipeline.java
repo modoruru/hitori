@@ -107,12 +107,5 @@ public class Pipeline<T> implements Iterable<T> {
         return order().stream().map(objects::get);
     }
 
-    /**
-     * @deprecated use {@link Pipeline#stream()} and {@link Stream#parallel()} instead.
-     */
-    @Deprecated(forRemoval = true)
-    public Stream<T> parallelStream() {
-        return stream().parallel();
-    }
 
 }

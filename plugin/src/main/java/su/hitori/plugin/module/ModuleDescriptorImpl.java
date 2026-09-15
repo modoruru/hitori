@@ -1,14 +1,13 @@
 package su.hitori.plugin.module;
 
-import com.mojang.brigadier.tree.LiteralCommandNode;
-import dev.jorel.commandapi.CommandAPICommand;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.Keyed;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.HitoriRegistryAccess;
+import su.hitori.api.Version;
 import su.hitori.api.command.CommandsModificationInfo;
 import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.logging.LoggerFactory;
@@ -21,37 +20,21 @@ import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Task;
 import su.hitori.plugin.CorePlugin;
 import su.hitori.plugin.module.compatibility.CompatibilityLayerImpl;
+import su.hitori.plugin.module.dependency.ModuleDependency;
 import su.hitori.plugin.module.enable.CommandsRegistrarImpl;
 import su.hitori.plugin.module.enable.ConfigurationsRegistrarImpl;
 import su.hitori.plugin.module.enable.ListenersRegistrarImpl;
+import su.hitori.plugin.module.exception.DependencyFailError;
+import su.hitori.plugin.module.exception.MetaReadError;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
-/*
-Work pipeline explanation
-
-# Default module load behavior
-1. load
-2. call setupCompatibility
-3. call enable
-4. call enable hooks module have created during setupCompatibility
-5. call third-party hooks which waits that module to enable
-
-# Module reload behavior with injected modules
-1. load
-2. call setupCompatibility
-3. call Module#enable(EnableContext)
-4. load, call setupCompatibility and call enable for every injected modules, and call enable hooks of injected module except originally reloaded module
-5. call third-party hooks for reloaded module
- */
 public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     private static final Logger logger = LoggerFactory.instance().create(ModuleDescriptor.class);
@@ -76,19 +59,25 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     private boolean enabling;
     private boolean enabled;
     private boolean loaded; // is jar loaded or not
-    boolean enabledOnce;
-    private boolean compatibilitySetUp;
+    private boolean enabledOnce;
+    private boolean compatibilitySetUp, compatibilitySetupFailed;
 
     public ModuleDescriptorImpl(ModuleRepositoryImpl moduleRepository) {
         this.moduleRepository = moduleRepository;
     }
 
-    public @Nullable ClassLoader classLoader() {
-        return classLoader;
+    @Override
+    public Key key() {
+        assert key != null;
+        return key;
     }
 
-    @Nullable ExtendedMeta getExtendedMeta() {
+    public @Nullable ExtendedMeta extendedMeta() {
         return extendedMeta;
+    }
+
+    public @Nullable ClassLoader classLoader() {
+        return classLoader;
     }
 
     @Nullable ModuleClassLoader getClassLoader() {
@@ -125,6 +114,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         catch (Throwable exception) {
             logger.severe("Module caused an exception in setupCompatibility - cancelled enabling. Exception presented below.");
             logger.warning(LoggerUtil.exceptionToString(exception));
+            compatibilitySetupFailed = true;
             return false;
         }
 
@@ -132,22 +122,56 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     }
 
     boolean enable() {
-        if(!loaded || enabled || enabling) return false;
+        if(!loaded || enabled || enabling || compatibilitySetupFailed) return false;
         try {
             assert key != null;
             logger.info("Enabling module \"" + key.asString() + "\"");
             if(!compatibilitySetUp && !setupCompatibility()) return false;
             enabling = true;
 
-            Set<String> notFound = new HashSet<>();
-            assert compatibilityLayer != null;
-            for (Key requiredModule : compatibilityLayer.required) {
-                if(!requiredModule.equals(key) && moduleRepository.getModule(requiredModule).isEmpty())
-                    notFound.add(requiredModule.asString());
+            assert extendedMeta != null;
+
+            // Incompatibility logging
+            Set<String> notFoundModules = new HashSet<>();
+            Set<String> incompatibleVersionsEntries = new HashSet<>();
+
+            for (Map.Entry<Key, ModuleDependency> entry : extendedMeta.modulesDependencies().entrySet()) {
+                Key requiredModule = entry.getKey();
+
+                ModuleDescriptorImpl descriptor = moduleRepository.descriptors.get(requiredModule);
+                if(descriptor == null || !descriptor.loaded || descriptor.compatibilitySetupFailed) {
+                    if(entry.getValue().type == ModuleDependency.Type.HARD)
+                        notFoundModules.add(requiredModule.asString());
+                    continue;
+                }
+
+                assert descriptor.extendedMeta != null;
+                Version presentVersion = descriptor.extendedMeta.moduleMeta().version();
+
+                if(!entry.getValue().compatible(presentVersion))
+                    incompatibleVersionsEntries.add(String.format("%s (required: %s, present: %s)", requiredModule.key(), entry.getValue(), presentVersion));
             }
 
-            if(!notFound.isEmpty()) {
-                logger.warning("Module \"" + key.asString() + "\" requires unknown modules: " + String.join(", ", notFound) + ". Enabling cancelled.");
+            if(!notFoundModules.isEmpty() || !incompatibleVersionsEntries.isEmpty()) {
+                StringBuilder builder = new StringBuilder("Failed to satisfy dependencies for ")
+                        .append(key.asString())
+                        .append(" module (enabling cancelled):");
+
+                if(!notFoundModules.isEmpty()) {
+                    builder.append("\n  Missing or unloaded dependencies:");
+                    for (String entry : notFoundModules) {
+                        builder.append("\n    - ").append(entry);
+                    }
+                }
+
+                if(!incompatibleVersionsEntries.isEmpty()) {
+                    builder.append("\n  Incompatible dependency versions:");
+                    for (String entry : incompatibleVersionsEntries) {
+                        builder.append("\n    - ").append(entry);
+                    }
+                }
+
+                logger.warning(builder.toString());
                 enabling = false;
                 return false;
             }
@@ -179,14 +203,6 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             }
 
             assert corePlugin != null;
-            if(!corePlugin.serverCoreInfo().isFolia()) {
-                Task.runGlobally(() -> {
-                    for (CommandAPICommand command : commandsRegistrar.oldCommands) {
-                        command.register(corePlugin);
-                    }
-                }, 1L);
-            }
-
             commandsModificationInfo = corePlugin.commandRegistryModifier().applyModificationsInBatch(
                     commandsRegistrar.commands,
                     Set.of()
@@ -238,34 +254,13 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             HandlerList.unregisterAll(listener);
         }
 
-        // Unregister command aliases
-        if(!corePlugin.serverCoreInfo().isFolia()) {
-            Set<String> toUnregister = new HashSet<>();
-            for (CommandAPICommand command : commandsRegistrar.oldCommands) {
-                toUnregister.add(command.getName());
-                toUnregister.addAll(Arrays.asList(command.getAliases()));
-            }
-
-            Task.ensureSync(() -> {
-                try {
-                    Method method = Class.forName("dev.jorel.commandapi.CommandAPI").getDeclaredMethod("unregister", String.class, boolean.class);
-                    for (String command : toUnregister) {
-                        method.invoke(null, command, true);
-                    }
-                }
-                catch (Exception _) {
-                    // ignore stacktrace
-                }
-            });
-        }
-
         if(commandsModificationInfo != null) {
             corePlugin.commandRegistryModifier().undoBatch(commandsModificationInfo);
             commandsModificationInfo = null;
         }
 
         listenersRegistrar.listeners.clear();
-        commandsRegistrar.oldCommands.clear();
+        commandsRegistrar.commands.clear();
     }
 
     @Override
@@ -296,7 +291,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             Class<?> mainClass = classLoader.loadClass(extendedMeta.bootstrapClass());
             Constructor<?> constructor = mainClass.getConstructor();
             Object instance = constructor.newInstance();
-            if(!(instance instanceof ModuleBootstrap moduleBootstrap)) throw new IllegalStateException("created instance is not a ModuleBootstrap");
+            if(!(instance instanceof ModuleBootstrap moduleBootstrap)) throw new IllegalStateException("Created instance is not an instance of ModuleBootstrap");
             return Optional.of(moduleBootstrap);
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -307,16 +302,9 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         this.corePlugin = corePlugin;
     }
 
-    void initializeJar(File jar) {
-        ExtendedMeta meta;
-        Key newKey;
-        try {
-            meta = ExtendedMeta.readMetaFromJar(jar);
-            newKey = meta.key();
-        }
-        catch (Throwable ex) {
-            throw new RuntimeException("Error while parsing jar meta ", ex);
-        }
+    void initializeJar(File jar) throws MetaReadError {
+        ExtendedMeta meta = ExtendedMeta.readMetaFromJar(jar);
+        Key newKey = meta.moduleMeta().key();
 
         boolean first = key == null;
 
@@ -360,7 +348,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             bootstrapClassloaderSkip = false;
     }
 
-    public void reload(File jar, boolean autoEnable, boolean reloadInjected, Set<ModuleDescriptorImpl> skipReloadIfInjected) {
+    public void reload(File jar, boolean autoEnable, boolean reloadInjected, Set<ModuleDescriptorImpl> skipReloadIfInjected) throws MetaReadError, DependencyFailError {
         if(enabled) disable();
 
         logger.info("Loading module from " + jar.getName());
@@ -368,12 +356,29 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         if(!bootstrapClassloaderSkip)
             initializeJar(jar);
 
+        assert corePlugin != null && extendedMeta != null && key != null;
+        if(!extendedMeta.hitoriDependency().compatible(corePlugin.version()))
+            throw new DependencyFailError(String.format(
+                    "%s requires hitori version %s, but version %s is installed.",
+                    key.asString(),
+                    extendedMeta.hitoriDependency(),
+                    corePlugin.version()
+            ));
+
+        if(!extendedMeta.javaDependency().compatible(corePlugin.javaVersionFeature()))
+            throw new DependencyFailError(String.format(
+                    "%s requires java version %s, but version %s is installed.",
+                    key.asString(),
+                    extendedMeta.javaDependency(),
+                    corePlugin.javaVersionFeature()
+            ));
+
         injected.removeAll(skipReloadIfInjected);
 
-        assert corePlugin != null && classLoader != null && key != null;
+        assert classLoader != null;
         moduleInstance = classLoader.create();
         listenersRegistrar = new ListenersRegistrarImpl();
-        commandsRegistrar = new CommandsRegistrarImpl(key, logger, corePlugin.serverCoreInfo());
+        commandsRegistrar = new CommandsRegistrarImpl();
         if(configurationsRegistrar != null) {
             for (Key key : configurationsRegistrar.configurations.keySet()) {
                 ((MappedRegistry<HitoriConfiguration<?>>) configurationsRegistrar.registry).remove(key);
@@ -386,11 +391,11 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             configurationsRegistrar.configurations.clear();
         }
         configurationsRegistrar = new ConfigurationsRegistrarImpl(corePlugin.access(HitoriRegistryAccess.CONFIGURATION).orElseThrow());
-        compatibilityLayer = new CompatibilityLayerImpl();
+        compatibilityLayer = new CompatibilityLayerImpl(extendedMeta.modulesDependencies(), moduleRepository);
 
         loaded = true;
+        compatibilitySetupFailed = false;
 
-        // FUCK COMMAND API - POOREST SHIT IN THE WORLD
         if(injected.isEmpty() || !reloadInjected) {
             if(autoEnable && enable()) {
                 callOutcomingHooks(null);
@@ -422,6 +427,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     }
 
     // todo: change how the enable hooks is called as CompletableFuture for finishing is not a very good option here.
+    // comment on todo: we don't have another options
     void callIncomingHooks() {
         assert key != null;
         moduleRepository.callEnableHooks(key);
@@ -452,12 +458,6 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     public @Nullable File getJar() {
         return currentJar;
-    }
-
-    @Override
-    public Key key() {
-        assert key != null;
-        return key;
     }
 
 }

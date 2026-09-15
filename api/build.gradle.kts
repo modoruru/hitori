@@ -57,7 +57,6 @@ publishing {
                     val dependenciesNode = asNode().appendNode("dependencies")
                     addDependency(dependenciesNode, "org.json", "json", property("json_version"))
                     addDependency(dependenciesNode, "net.elytrium", "serializer", property("serializer_version"))
-                    addDependency(dependenciesNode, "dev.jorel", "commandapi-paper-core", property("commandapi_version"))
                 }
             }
         }

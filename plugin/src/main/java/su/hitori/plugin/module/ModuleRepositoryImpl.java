@@ -15,6 +15,8 @@ import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Pipeline;
 import su.hitori.plugin.CorePlugin;
 import su.hitori.plugin.module.compatibility.CompatibilityLayerImpl;
+import su.hitori.plugin.module.exception.DependencyFailError;
+import su.hitori.plugin.module.exception.MetaReadError;
 
 import java.io.File;
 import java.util.Optional;
@@ -25,7 +27,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
 
     private @Nullable CorePlugin corePlugin;
     private final Logger logger = LoggerFactory.instance().create();
-    private final Pipeline<ModuleDescriptorImpl> descriptors = new Pipeline<>();
+    public final Pipeline<ModuleDescriptorImpl> descriptors = new Pipeline<>();
 
     public void corePlugin(CorePlugin corePlugin) {
         if(this.corePlugin == null) {
@@ -37,11 +39,13 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         // maybe replace with a faster logic
         Class<?> clazz = null;
         for (ModuleDescriptorImpl descriptor : descriptors) {
-            assert descriptor.getExtendedMeta() != null && descriptor.getClassLoader() != null;
-            if(name.startsWith(descriptor.getExtendedMeta().packageName())) {
-                try {
-                    clazz = descriptor.getClassLoader().loadClass(requestSource, name, resolve);
-                } catch (ClassNotFoundException _) {}
+            assert descriptor.extendedMeta() != null && descriptor.getClassLoader() != null;
+            for (String aPackage : descriptor.extendedMeta().packages()) {
+                if(name.startsWith(aPackage)) {
+                    try {
+                        clazz = descriptor.getClassLoader().loadClass(requestSource, name, resolve);
+                    } catch (ClassNotFoundException _) {}
+                }
             }
         }
         return clazz;
@@ -122,6 +126,10 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
             descriptor = new ModuleDescriptorImpl(this);
             descriptor.initializeJar(moduleJarFile);
         }
+        catch (MetaReadError metaReadError) {
+            logger.warning(convertMetaReadError(moduleJarFile.getName(), metaReadError));
+            return;
+        }
         catch (Throwable exception) {
             logger.warning(LoggerUtil.exceptionToString(exception));
             return;
@@ -130,27 +138,55 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
         descriptors.addLast(descriptor.key(), descriptor);
     }
 
+    public static String convertMetaReadError(String jarFileName, MetaReadError metaReadError) {
+        StringBuilder errorBuilder = new StringBuilder("Error while reading metadata of the module ");
+        errorBuilder.append(jarFileName).append(": ");
+
+        switch (metaReadError.type) {
+            case IO -> {
+                assert metaReadError.ioException != null;
+                errorBuilder.append("An IO error occurred: ").append(LoggerUtil.exceptionToString(metaReadError.ioException));
+            }
+            case OLD_FORMAT -> errorBuilder.append("Module uses old format of metadata. See more about migrating your module to 2.0.0 at our wiki: https://github.com/modoruru/hitori/wiki/Migrating#from-1xx-to-200");
+            case MISSING_FIELD -> errorBuilder.append("Metadata misses field \"").append(metaReadError.missingField).append("\"");
+            case MISSING_MODULE_JSON -> errorBuilder.append("Jar misses hitori.module.json file.");
+            case FORMAT -> errorBuilder.append(metaReadError.formatMessage);
+        }
+        return errorBuilder.toString();
+    }
+
     public void enableAll() {
         enablePaperAccessHook();
 
         descriptors.forEach(descriptor -> {
             assert descriptor.getJar() != null && corePlugin != null;
             descriptor.corePlugin(corePlugin);
-            descriptor.reload(descriptor.getJar(), false, false, Set.of());
+            try {
+                descriptor.reload(descriptor.getJar(), false, false, Set.of());
+            }
+            catch (MetaReadError metaReadError) {
+                logger.warning(convertMetaReadError(descriptor.getJar().getName(), metaReadError));
+            }
+            catch (DependencyFailError dependencyFailError) {
+                logger.warning(dependencyFailError.error);
+            }
         });
         descriptors.forEach(ModuleDescriptorImpl::setupCompatibility);
 
         descriptors.sort((first, second) -> {
-            assert first.getCompatibilityLayer() != null && second.getCompatibilityLayer() != null;
-            if(first.getCompatibilityLayer().required.contains(second.key())) return 1;
-            else if (second.getCompatibilityLayer().required.contains(first.key())) return -1;
+            assert first.extendedMeta() != null && second.extendedMeta() != null;
+
+            if(first.extendedMeta().modulesDependencies().containsKey(second.key())) return 1;
+            else if(second.extendedMeta().modulesDependencies().containsKey(first.key())) return -1;
+
             return 0;
         });
 
         descriptors.forEach(ModuleDescriptorImpl::enable);
 
         for (ModuleDescriptorImpl descriptor : descriptors) {
-            descriptor.callIncomingHooks();
+            if(descriptor.isEnabled())
+                descriptor.callIncomingHooks();
         }
     }
 

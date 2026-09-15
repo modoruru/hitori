@@ -57,11 +57,6 @@ public class MappedRegistry<E extends Keyed> implements Registry<E> {
     }
 
     @Override
-    public Optional<E> getOptional(Key key) {
-        return optional(key);
-    }
-
-    @Override
     public Optional<E> optional(Key key) {
         return Optional.ofNullable(map.get(key));
     }

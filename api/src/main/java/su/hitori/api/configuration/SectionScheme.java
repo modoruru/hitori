@@ -45,7 +45,7 @@ import java.util.Map;
  *     public class ExampleSection extends SectionScheme {
  *         public final Field<String> exampleStringInSection = Field.create("Example string in the section!");
  *     }
- * }
+ * }}</pre>
  */
 public abstract class SectionScheme {
 

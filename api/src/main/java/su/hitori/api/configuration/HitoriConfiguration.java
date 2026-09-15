@@ -185,16 +185,8 @@ public final class HitoriConfiguration<RootScheme extends SectionScheme> impleme
 
             if(anyListeners()) compareDataAndCallListeners(Map.copyOf(context.rawData), Map.of());
 
-            cleanupSectionRecursively(context.rawData);
+            context.rawData.clear(); // context.rawData is flat - there's no embedded maps
         }
-    }
-
-    private static void cleanupSectionRecursively(Map<String, Object> rawSection) {
-        for (Object value : rawSection.values()) {
-            if(value instanceof Map<?, ?> childMap)
-                cleanupSectionRecursively(UnsafeUtil.cast(childMap));
-        }
-        rawSection.clear();
     }
 
     /**

@@ -47,7 +47,7 @@ public final class SafeUtil {
         return wrapParse(UUID::fromString, string);
     }
 
-    private static <E> @Nullable E wrapParse(Function<String, E> parseFunction, String string) {
+    public static <E> @Nullable E wrapParse(ThrowingFunction<String, E> parseFunction, String string) {
         try {
             return parseFunction.apply(string);
         }
@@ -65,5 +65,11 @@ public final class SafeUtil {
         }
     }
 
+    @FunctionalInterface
+    public interface ThrowingFunction<T, R> {
+
+        R apply(T element) throws Exception;
+
+    }
 
 }

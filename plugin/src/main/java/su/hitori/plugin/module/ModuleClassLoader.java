@@ -28,7 +28,7 @@ final class ModuleClassLoader extends URLClassLoader implements ModuleInitialize
 
     @Override
     public ModuleMeta getModuleMeta() {
-        return extendedMeta.toModuleMeta();
+        return extendedMeta.moduleMeta();
     }
 
     @Override
@@ -60,7 +60,9 @@ final class ModuleClassLoader extends URLClassLoader implements ModuleInitialize
 
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-        if(name.startsWith(extendedMeta.packageName())) return super.loadClass(name, resolve);
+        for (String aPackage : extendedMeta.packages()) {
+            if(name.startsWith(aPackage)) return super.loadClass(name, resolve);
+        }
 
         Class<?> moduleSpecific = moduleRepository.loadModuleSpecificClass(moduleDescriptor, name, resolve);
         if(moduleSpecific != null) return moduleSpecific;

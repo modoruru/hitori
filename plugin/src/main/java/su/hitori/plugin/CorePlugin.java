@@ -8,11 +8,7 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jspecify.annotations.Nullable;
-import su.hitori.api.Hitori;
-import su.hitori.api.HitoriHolder;
-import su.hitori.api.HitoriRegistryAccess;
-import su.hitori.api.ServerCoreInfo;
-import su.hitori.api.command.CommandsRegistryModifier;
+import su.hitori.api.*;
 import su.hitori.api.configuration.ConfigurationSource;
 import su.hitori.api.configuration.HitoriConfiguration;
 import su.hitori.api.configuration.serializer.YAMLSerializer;
@@ -39,6 +35,8 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
     private final LoggerFactory loggerFactory;
     private final ModuleRepositoryImpl moduleRepository;
     private final ServerCoreInfo serverCoreInfo;
+    private final Version version;
+    private final Integer javaVersion;
 
     private final Registry<HitoriConfiguration<?>> configurationRegistry;
 
@@ -48,6 +46,8 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
         this.loggerFactory = loggerFactory;
         this.moduleRepository = moduleRepository;
         this.serverCoreInfo = new ServerCoreInfoImpl();
+        this.version = new Version(getPluginMeta().getVersion());
+        this.javaVersion = Runtime.version().feature();
 
         this.configurationRegistry = new MappedRegistry<>(HitoriRegistryAccess.CONFIGURATION);
 
@@ -110,13 +110,21 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
     }
 
     @Override
-    public ModuleRepository moduleRepository() {
+    public ModuleRepositoryImpl moduleRepository() {
         return moduleRepository;
     }
 
     @Override
     public ServerCoreInfo serverCoreInfo() {
         return serverCoreInfo;
+    }
+
+    public Version version() {
+        return version;
+    }
+
+    public int javaVersionFeature() {
+        return javaVersion;
     }
 
     public Registry<HitoriConfiguration<?>> configurationRegistry() {
