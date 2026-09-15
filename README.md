@@ -43,7 +43,7 @@ After downloading the jar, just put it into plugins folder.
 <dependency>
     <groupId>su.hitori</groupId>
     <artifactId>hitori</artifactId>
-    <version>1.2.1</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 </details>
@@ -58,7 +58,7 @@ maven {
 ```
 
 ```groovy
-implementation("su.hitori:hitori:1.2.1")
+implementation("su.hitori:hitori:2.0.0")
 ```
 </details>
 
