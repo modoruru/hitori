@@ -20,8 +20,6 @@ public final class VersionTest {
         for (String aCase : cases) {
             Assertions.assertEquals(aCase, new Version(aCase).toString());
         }
-
-        Assertions.assertEquals("1.0.0", new Version("1.0").toString());
     }
 
     @Test
@@ -30,7 +28,8 @@ public final class VersionTest {
                 "v0.1.0",
                 "843718941",
                 "24-2.2467146",
-                "24w07a"
+                "24w07a",
+                "1.0"
         );
 
         for (String aCase : cases) {
