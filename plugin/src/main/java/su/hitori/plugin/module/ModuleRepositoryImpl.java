@@ -27,7 +27,7 @@ public final class ModuleRepositoryImpl implements ModuleRepository {
 
     private @Nullable CorePlugin corePlugin;
     private final Logger logger = LoggerFactory.instance().create();
-    private final Pipeline<ModuleDescriptorImpl> descriptors = new Pipeline<>();
+    public final Pipeline<ModuleDescriptorImpl> descriptors = new Pipeline<>();
 
     public void corePlugin(CorePlugin corePlugin) {
         if(this.corePlugin == null) {

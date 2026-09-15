@@ -353,7 +353,7 @@ final class HitoriCommand {
 
     private static int dump(CorePlugin corePlugin, CommandContext<CommandSourceStack> context) {
         DumpBuilder builder = new DumpBuilder().indentation(2);
-        ModuleRepository moduleRepository = corePlugin.moduleRepository();
+        ModuleRepositoryImpl moduleRepository = corePlugin.moduleRepository();
         var ciCdInfo = extractCiCdInfo(corePlugin).orElse(Pair.of("ide", "ide"));
 
         // plugin info, server info, hardware info
@@ -366,14 +366,10 @@ final class HitoriCommand {
         if(!moduleRepository.keySet().isEmpty()) {
             builder.startSection("modules");
 
-            for (Key key : moduleRepository.keySet()) {
-                builder.startSection(key.asString());
+            for (ModuleDescriptorImpl descriptor : moduleRepository.descriptors) {
+                builder.startSection(descriptor.key().asString());
 
-                var opt = moduleRepository.getModule(key)
-                        .map(ModuleDescriptor::getInstance)
-                        .map(Module::moduleMeta);
-                assert opt.isPresent();
-                ModuleMeta moduleMeta = opt.get();
+                ModuleMeta moduleMeta = descriptor.getInstance().moduleMeta();
 
                 builder.appendParameter("version", moduleMeta.version().toString(), "aqua");
                 if(moduleMeta.buildInfo() != null) {

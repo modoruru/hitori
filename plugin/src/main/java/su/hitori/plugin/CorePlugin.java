@@ -110,7 +110,7 @@ public final class CorePlugin extends JavaPlugin implements Hitori, HitoriRegist
     }
 
     @Override
-    public ModuleRepository moduleRepository() {
+    public ModuleRepositoryImpl moduleRepository() {
         return moduleRepository;
     }
 

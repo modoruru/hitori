@@ -5,7 +5,7 @@ import net.kyori.adventure.key.Keyed;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.HitoriRegistryAccess;
 import su.hitori.api.Version;
 import su.hitori.api.command.CommandsModificationInfo;
@@ -18,9 +18,9 @@ import su.hitori.api.module.enable.EnableContext;
 import su.hitori.api.registry.MappedRegistry;
 import su.hitori.api.util.LoggerUtil;
 import su.hitori.api.util.Task;
-import su.hitori.api.util.UnsafeUtil;
 import su.hitori.plugin.CorePlugin;
 import su.hitori.plugin.module.compatibility.CompatibilityLayerImpl;
+import su.hitori.plugin.module.dependency.ModuleDependency;
 import su.hitori.plugin.module.enable.CommandsRegistrarImpl;
 import su.hitori.plugin.module.enable.ConfigurationsRegistrarImpl;
 import su.hitori.plugin.module.enable.ListenersRegistrarImpl;
@@ -35,7 +35,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
-// god forgive me for this thing
 public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     private static final Logger logger = LoggerFactory.instance().create(ModuleDescriptor.class);
@@ -61,18 +60,24 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     private boolean enabled;
     private boolean loaded; // is jar loaded or not
     private boolean enabledOnce;
-    private boolean compatibilitySetUp;
+    private boolean compatibilitySetUp, compatibilitySetupFailed;
 
     public ModuleDescriptorImpl(ModuleRepositoryImpl moduleRepository) {
         this.moduleRepository = moduleRepository;
     }
 
-    public @Nullable ClassLoader classLoader() {
-        return classLoader;
+    @Override
+    public Key key() {
+        assert key != null;
+        return key;
     }
 
-    @Nullable ExtendedMeta extendedMeta() {
+    public @Nullable ExtendedMeta extendedMeta() {
         return extendedMeta;
+    }
+
+    public @Nullable ClassLoader classLoader() {
+        return classLoader;
     }
 
     @Nullable ModuleClassLoader getClassLoader() {
@@ -109,6 +114,7 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
         catch (Throwable exception) {
             logger.severe("Module caused an exception in setupCompatibility - cancelled enabling. Exception presented below.");
             logger.warning(LoggerUtil.exceptionToString(exception));
+            compatibilitySetupFailed = true;
             return false;
         }
 
@@ -116,24 +122,26 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
     }
 
     boolean enable() {
-        if(!loaded || enabled || enabling) return false;
+        if(!loaded || enabled || enabling || compatibilitySetupFailed) return false;
         try {
             assert key != null;
             logger.info("Enabling module \"" + key.asString() + "\"");
             if(!compatibilitySetUp && !setupCompatibility()) return false;
             enabling = true;
 
-            Set<String> notFound = new HashSet<>(), incompatibleVersionEntry = new HashSet<>();
-            assert compatibilityLayer != null && extendedMeta != null;
-            for (Map.Entry<Key, ExtendedMeta.ModuleDependency> entry : extendedMeta.modulesDependencies().entrySet()) {
+            assert extendedMeta != null;
+
+            // Incompatibility logging
+            Set<String> notFoundModules = new HashSet<>();
+            Set<String> incompatibleVersionsEntries = new HashSet<>();
+
+            for (Map.Entry<Key, ModuleDependency> entry : extendedMeta.modulesDependencies().entrySet()) {
                 Key requiredModule = entry.getKey();
 
-                ModuleDescriptorImpl descriptor = moduleRepository.getModule(requiredModule)
-                        .<ModuleDescriptorImpl>map(UnsafeUtil::cast)
-                        .orElse(null);
-                if(descriptor == null || !descriptor.loaded) {
-                    if(entry.getValue().type == ExtendedMeta.ModuleDependency.Type.HARD)
-                        notFound.add(key.asString());
+                ModuleDescriptorImpl descriptor = moduleRepository.descriptors.get(requiredModule);
+                if(descriptor == null || !descriptor.loaded || descriptor.compatibilitySetupFailed) {
+                    if(entry.getValue().type == ModuleDependency.Type.HARD)
+                        notFoundModules.add(requiredModule.asString());
                     continue;
                 }
 
@@ -141,20 +149,25 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
                 Version presentVersion = descriptor.extendedMeta.moduleMeta().version();
 
                 if(!entry.getValue().compatible(presentVersion))
-                    incompatibleVersionEntry.add(String.format("%s (required: %s, present: %s)", requiredModule.key(), entry.getValue(), presentVersion));
+                    incompatibleVersionsEntries.add(String.format("%s (required: %s, present: %s)", requiredModule.key(), entry.getValue(), presentVersion));
             }
 
-            if(!notFound.isEmpty() || !incompatibleVersionEntry.isEmpty()) {
-                StringBuilder builder = new StringBuilder("Failed to satisfy dependencies of ").append(key.asString()).append(" module (enabling cancelled):");
-                if(!notFound.isEmpty())
-                    builder.append("\nNot found or failed to load modules: ").append(String.join(", ", notFound));
+            if(!notFoundModules.isEmpty() || !incompatibleVersionsEntries.isEmpty()) {
+                StringBuilder builder = new StringBuilder("Failed to satisfy dependencies for ")
+                        .append(key.asString())
+                        .append(" module (enabling cancelled):");
 
-                if(!incompatibleVersionEntry.isEmpty()) {
-                    builder.append("\nIncompatible versions:\n");
-                    Iterator<String> entriesIterator = incompatibleVersionEntry.iterator();
-                    while (entriesIterator.hasNext()) {
-                        builder.append("- ").append(entriesIterator.next());
-                        if(entriesIterator.hasNext()) builder.append('\n');
+                if(!notFoundModules.isEmpty()) {
+                    builder.append("\n  Missing or unloaded dependencies:");
+                    for (String entry : notFoundModules) {
+                        builder.append("\n    - ").append(entry);
+                    }
+                }
+
+                if(!incompatibleVersionsEntries.isEmpty()) {
+                    builder.append("\n  Incompatible dependency versions:");
+                    for (String entry : incompatibleVersionsEntries) {
+                        builder.append("\n    - ").append(entry);
                     }
                 }
 
@@ -378,9 +391,10 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             configurationsRegistrar.configurations.clear();
         }
         configurationsRegistrar = new ConfigurationsRegistrarImpl(corePlugin.access(HitoriRegistryAccess.CONFIGURATION).orElseThrow());
-        compatibilityLayer = new CompatibilityLayerImpl();
+        compatibilityLayer = new CompatibilityLayerImpl(extendedMeta.modulesDependencies(), moduleRepository);
 
         loaded = true;
+        compatibilitySetupFailed = false;
 
         if(injected.isEmpty() || !reloadInjected) {
             if(autoEnable && enable()) {
@@ -444,12 +458,6 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
 
     public @Nullable File getJar() {
         return currentJar;
-    }
-
-    @Override
-    public Key key() {
-        assert key != null;
-        return key;
     }
 
 }

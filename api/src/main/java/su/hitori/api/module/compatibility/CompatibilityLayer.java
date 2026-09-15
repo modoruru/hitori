@@ -1,6 +1,7 @@
 package su.hitori.api.module.compatibility;
 
 import net.kyori.adventure.key.Key;
+import org.jspecify.annotations.Nullable;
 import su.hitori.api.module.Module;
 
 /**
@@ -21,11 +22,23 @@ public interface CompatibilityLayer {
     CompatibilityLayer require(Key key);
 
     /**
-     * Adds a hook to other module enabling. If module with specified key enables, the hook will be called.
-     * @param key key of module to add hook to
+     * Adds a hook that triggers when another module is enabled.
+     * @param key key of the module to add hook to
      * @param runnable hook itself
+     * @throws IllegalStateException if the module is specified as a dependency but the module version is incompatible. if dependency is of hard type, it'll also throw if the module is not present at all
+     * @throws IllegalArgumentException if the requested module is not specified as a dependency in hitori.module.json
+     * @see CompatibilityLayer#compatible(Key)
      * @return that CompatibilityLayer
      */
     CompatibilityLayer addEnableHook(Key key, Runnable runnable);
+
+
+    /**
+     * Checks if the module specified as a dependency is compatible with the currently installed one. Can be useful to check soft dependencies before calling {@link CompatibilityLayer#addEnableHook(Key, Runnable)}.
+     * @param key key of the module to check
+     * @throws IllegalArgumentException if the requested module is not specified as a dependency in hitori.module.json
+     * @return null, if module is not present at all
+     */
+    @Nullable Boolean compatible(Key key);
 
 }
