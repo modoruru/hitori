@@ -62,6 +62,9 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
         if(type == null)
             throw MetaReadError.format("Unknown dependency type for the " + module + " module dependency.");
 
+        if(type == ModuleDependency.Type.INCOMPATIBLE)
+            return new ModuleDependency(null, null, ModuleDependency.Type.INCOMPATIBLE);
+
         Dependency.Operator operator = Dependency.readOperator(dependency);
         if(operator == null) throw MetaReadError.format("Unable to read operator for \"" + module + "\" dependency.");
         Version dependencyBase = parseVersion(dependency.substring(operator.symbols));

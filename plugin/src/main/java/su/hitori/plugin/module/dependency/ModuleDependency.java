@@ -12,7 +12,7 @@ public final class ModuleDependency extends Dependency<Version> {
     }
 
     public enum Type {
-        SOFT, HARD
+        SOFT, HARD, INCOMPATIBLE
     }
 
 }

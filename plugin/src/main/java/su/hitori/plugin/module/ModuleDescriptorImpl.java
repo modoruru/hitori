@@ -136,20 +136,26 @@ public final class ModuleDescriptorImpl implements ModuleDescriptor {
             Set<String> incompatibleVersionsEntries = new HashSet<>();
 
             for (Map.Entry<Key, ModuleDependency> entry : extendedMeta.modulesDependencies().entrySet()) {
+                ModuleDependency dependency = entry.getValue();
                 Key requiredModule = entry.getKey();
 
                 ModuleDescriptorImpl descriptor = moduleRepository.descriptors.get(requiredModule);
                 if(descriptor == null || !descriptor.loaded || descriptor.compatibilitySetupFailed) {
-                    if(entry.getValue().type == ModuleDependency.Type.HARD)
+                    if(dependency.type == ModuleDependency.Type.HARD)
                         notFoundModules.add(requiredModule.asString());
+                    continue;
+                }
+
+                if(dependency.type == ModuleDependency.Type.INCOMPATIBLE) {
+                    incompatibleVersionsEntries.add(String.format("%s (compatibility disabled at all)", requiredModule.key()));
                     continue;
                 }
 
                 assert descriptor.extendedMeta != null;
                 Version presentVersion = descriptor.extendedMeta.moduleMeta().version();
 
-                if(!entry.getValue().compatible(presentVersion))
-                    incompatibleVersionsEntries.add(String.format("%s (required: %s, present: %s)", requiredModule.key(), entry.getValue(), presentVersion));
+                if(!dependency.compatible(presentVersion))
+                    incompatibleVersionsEntries.add(String.format("%s (required: %s, present: %s)", requiredModule.key(), dependency, presentVersion));
             }
 
             if(!notFoundModules.isEmpty() || !incompatibleVersionsEntries.isEmpty()) {
