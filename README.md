@@ -13,8 +13,8 @@ This is what *hitori* tries to do by providing an API for registering such thing
 
 ## Main features
 - Modules
-- Safe bukkit listeners and commands registration
-- More convenient logging system for modules
+- Safe listeners and commands registration
+- Convenient logging system for modules
 - Custom configuration API
 - Many utils regarding I/O, tasks scheduling with [Folia](https://github.com/PaperMC/Folia) support, creating YAML configurations, etc.
 
@@ -43,7 +43,7 @@ After downloading the jar, just put it into plugins folder.
 <dependency>
     <groupId>su.hitori</groupId>
     <artifactId>hitori</artifactId>
-    <version>2.0.0</version>
+    <version>2.1.0</version>
 </dependency>
 ```
 </details>
@@ -58,11 +58,11 @@ maven {
 ```
 
 ```groovy
-implementation("su.hitori:hitori:2.0.0")
+implementation("su.hitori:hitori:2.1.0")
 ```
 </details>
 
 ## Credits
 [justlofe](https://github.com/justlofe) - lead developer and maintainer\
-[StreamVersus](https://github.com/StreamVersus) - wrote several utils\
+[StreamVersus](https://github.com/StreamVersus) - had been proposing this idea for over a year and wrote several utils (big thanks)\
 [suiteark](https://github.com/suiteark) - stress tester for stability testing
