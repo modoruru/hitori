@@ -55,8 +55,8 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
     private static ModuleDependency parseModuleDependency(String module, JSONObject object) throws MetaReadError {
         String dependency = object.optString("version", null);
         String rawType = object.optString("type", null);
-        if(dependency == null || rawType == null)
-            throw MetaReadError.format("Version and/or type strings are missing for the " + module + " module dependency.");
+        if(rawType == null)
+            throw MetaReadError.format("Type string are missing for the " + module + " module dependency.");
 
         ModuleDependency.Type type = SafeUtil.enumValueOf(ModuleDependency.Type.class, rawType.toUpperCase());
         if(type == null)
@@ -64,6 +64,9 @@ public record ExtendedMeta(String mainClass, @Nullable String bootstrapClass, Se
 
         if(type == ModuleDependency.Type.INCOMPATIBLE)
             return new ModuleDependency(null, null, ModuleDependency.Type.INCOMPATIBLE);
+
+        if(dependency == null)
+            throw MetaReadError.format("Version string are missing for the " + module + " module dependency.");
 
         Dependency.Operator operator = Dependency.readOperator(dependency);
         if(operator == null) throw MetaReadError.format("Unable to read operator for \"" + module + "\" dependency.");
